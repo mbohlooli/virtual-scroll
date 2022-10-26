@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, ViewRef } from '@angular/core';
 import { BehaviorSubject, filter, fromEvent, map, Subscription } from 'rxjs';
 
 @Component({
@@ -8,9 +8,20 @@ import { BehaviorSubject, filter, fromEvent, map, Subscription } from 'rxjs';
 })
 export class VirtualListComponent implements AfterViewInit, OnDestroy {
   @ViewChild('listContainer') private _listContainer!: ElementRef;
+  @ViewChild('sentinel') private _sentinel!: ElementRef;
+
+  get sentinel(): ElementRef {
+    return this._sentinel;
+  }
 
   get scrollPosition$() {
     return this._scrollPositionSubject.asObservable();
+  }
+
+  get height(): number {
+    return window.innerHeight;
+    // const rect = this._listContainer.nativeElement.getBoundingClientRect();
+    // return rect.height;
   }
 
   private _subscription = new Subscription();
