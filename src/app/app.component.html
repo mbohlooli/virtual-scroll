@@ -1,6 +1,6 @@
-<section class="container">
-  <article class="article" *ngFor="let d of data">
-    <img *ngIf="hasImage" loading="lazy" class="image" [src]="randomImage" />
-    {{generateRandomText()}}
+<virtual-list>
+  <article class="article" *ngFor="let item of data">
+    <img *ngIf="item.image" loading="lazy" class="image" [src]="item.image" />
+    {{item.text}}
   </article>
-</section>
+</virtual-list>

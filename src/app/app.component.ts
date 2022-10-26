@@ -6,7 +6,7 @@ import { Component, OnInit } from '@angular/core';
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements OnInit {
-  data: number[] = [];
+  data: { index: number, text: string, image: string }[] = [];
 
   images: string[] = [
     '../assets/images/image0.jpg',
@@ -39,7 +39,6 @@ export class AppComponent implements OnInit {
     '../assets/images/image27.jpg',
     '../assets/images/image28.jpg',
     '../assets/images/image29.jpg',
-    '../assets/images/image30.jpg',
     '../assets/images/image31.jpg',
     '../assets/images/image32.jpg',
     '../assets/images/image33.jpg',
@@ -62,7 +61,11 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     for (let i = 0; i < 1000; i++)
-      this.data.push(i);
+      this.data.push({
+        index: i,
+        text: this.generateRandomText(),
+        image: Math.random() > 0.8 ? this.randomImage : ''
+      });
   }
 
   generateRandomText() {
