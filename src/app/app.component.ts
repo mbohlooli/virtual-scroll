@@ -51,16 +51,12 @@ export class AppComponent implements OnInit {
     '../assets/images/image40.jpg',
   ];
 
-  get hasImage() {
-    return Math.random() > 0.9;
-  }
-
   get randomImage() {
     return this.images[Math.floor(Math.random() * this.images.length)]
   }
 
   ngOnInit(): void {
-    for (let i = 0; i < 1000; i++)
+    for (let i = 0; i < 100; i++)
       this.data.push({
         index: i,
         text: this.generateRandomText(),

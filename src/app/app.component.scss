@@ -1,14 +1,23 @@
+$white: #fff;
+$text-color: #333;
+$shadow-color: rgba(0, 0, 0, 0.1);
+
 .article {
   padding: 7px 10px;
-  color: #333;
-  background: #fff;
-  box-shadow: 0 3px 2px rgba(0, 0, 0, 0.1);
+  color: $text-color;
+  background: $white;
+  box-shadow: 0 3px 2px $shadow-color;
   position: relative;
   max-width: 420px;
   width: 100%;
   min-width: 80px;
   margin: 10px 5px;
   word-wrap: break-word;
+}
+
+.fixed-height-article {
+  height: 100px !important;
+  overflow: hidden !important;
 }
 
 .image {

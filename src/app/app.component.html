@@ -1,6 +1,9 @@
 <virtual-list>
-  <article class="article" *ngFor="let item of data">
-    <img *ngIf="item.image" loading="lazy" class="image" [src]="item.image" />
+  <article class="article fixed-height-article" *virtualForConstantHeight="let item of data; rowHeight: 100">
     {{item.text}}
   </article>
+  <!-- <article class="article" *ngFor="let item of data">
+    <img *ngIf="item.image" loading="lazy" class="image" [src]="item.image" />
+    {{item.text}}
+  </article> -->
 </virtual-list>

@@ -14,7 +14,8 @@ import { VirtualForConstantHeightDirective } from './directives/virtual-for-cons
   ],
   exports: [
     VirtualListComponent,
-    VirtualForDirective
+    VirtualForDirective,
+    VirtualForConstantHeightDirective
   ],
   imports: [
     CommonModule
