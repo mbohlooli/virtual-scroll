@@ -1,31 +1,81 @@
-import { Directive, DoCheck, EmbeddedViewRef, Input, IterableChanges, IterableDiffer, IterableDiffers, NgIterable, OnChanges, OnDestroy, OnInit, Renderer2, SimpleChanges, TemplateRef, ViewContainerRef, ViewRef } from '@angular/core';
-import { filter, Subscription } from 'rxjs';
+import { Directive, DoCheck, EmbeddedViewRef, Input, isDevMode, IterableChanges, IterableDiffer, IterableDiffers, NgIterable, OnChanges, OnDestroy, OnInit, Renderer2, SimpleChanges, TemplateRef, TrackByFunction, ViewContainerRef, ViewRef } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
+import { Recycler } from './recycler';
+
+export class InfiniteRow {
+  constructor(public $implicit: any, public index: number, public count: number) {
+  }
+
+  get first(): boolean {
+    return this.index === 0;
+  }
+
+  get last(): boolean {
+    return this.index === this.count - 1;
+  }
+
+  get even(): boolean {
+    return this.index % 2 === 0;
+  }
+
+  get odd(): boolean {
+    return !this.even;
+  }
+}
 
 @Directive({
   selector: '[virtualForConstantHeight][virtualForConstantHeightOf]'
 })
 export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, DoCheck, OnDestroy {
   @Input('virtualForConstantHeightOf') data!: NgIterable<T>;
+
+  @Input('virtualForConstantHeightTrackBy')
+  set trackBy(fn: TrackByFunction<T>) {
+    if (isDevMode() && fn != null && typeof fn !== 'function' && <any>console && <any>console.warn)
+      console.warn(`trackBy must be a function, but received ${JSON.stringify(fn)}.`);
+
+    this._trackByFn = fn;
+  }
+
+  @Input('virtualForConstantHeightTemplate')
+  set template(value: TemplateRef<InfiniteRow>) {
+    if (value)
+      this._template = value;
+  }
+
+  // TODO: pass this to component and then get from it
+  @Input('virtualForConstantHeightOnScrollEnd') scrollEnd!: () => void;
+
   @Input('virtualForConstantHeightRowHeight') rowHeight!: number;
 
-  private _subscription = new Subscription();
-  private _scrollY = -1;
-  private _isInMeasure = false;
-  private _isInLayout = false;
+  private _scrollY!: number;
+
   private _differ!: IterableDiffer<T>;
-  // TODO: find a better name for this
-  private _collection: any[] = [];
+  private _trackByFn!: TrackByFunction<T>;
+  private _subscription: Subscription = new Subscription();
+
+  private _collection!: any[];
+
+  private _firstItemPosition!: number;
+  private _lastItemPosition!: number;
+
+  private _isInLayout: boolean = false;
+  private _isInMeasure: boolean = false;
+
   private _pendingMeasurement!: number;
-  private _startIndex: number = 0;
-  private _endIndex: number = 0;
-  private _offset = 0;
+  private _loading = false;
+
+  private _recycler = new Recycler();
+
+  private _previousStartIndex = 0;
+  private _previousEndIndex = 0;
 
   constructor(
-    private virtualList: VirtualListComponent,
-    private viewContainerRef: ViewContainerRef,
-    private templateRef: TemplateRef<any>,
+    private _infiniteList: VirtualListComponent,
     private _differs: IterableDiffers,
+    private _template: TemplateRef<InfiniteRow>,
+    private _viewContainerRef: ViewContainerRef,
     private _renderer: Renderer2,
   ) { }
 
@@ -33,84 +83,196 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     if (!('data' in changes)) return;
 
     const value = changes['data'].currentValue;
+    if (this._differ || !value) return;
 
-    if (this._differ && value) return;
-
-    this._differ = this._differs.find(value).create();
-  }
-
-  ngOnInit(): void {
-    this._subscription.add(
-      this.virtualList.scrollPosition$.pipe(
-        filter(scrollY => Math.abs(scrollY - this._scrollY) >= this.rowHeight)
-      ).subscribe(scrollY => {
-        this._scrollY = scrollY;
-        this.requestLayout();
-      })
-    );
+    try {
+      this._differ = this._differs.find(value).create(this._trackByFn);
+    } catch (e) {
+      throw new Error(`Cannot find a differ supporting object '${value}' of this type. NgFor only supports binding to Iterables such as Arrays.`);
+    }
   }
 
   ngDoCheck(): void {
     if (!this._differ) return;
-    const changes = this._differ.diff(this.data);
 
-    if (changes) this.applyChanges(changes);
+    const changes = this._differ.diff(this.data);
+    if (!changes) return;
+
+    this.applyChanges(changes);
+  }
+
+  ngOnInit(): void {
+    this._subscription.add(
+      this._infiniteList.scrollPosition$
+        .subscribe((scrollY) => {
+          this._scrollY = scrollY;
+          this.requestLayout();
+        })
+    );
+    // TODO: add Size change
   }
 
   ngOnDestroy(): void {
     this._subscription.unsubscribe();
+    this._recycler.clean();
   }
 
   private applyChanges(changes: IterableChanges<T>) {
-    changes.forEachAddedItem(itemRecord => this._collection.push(itemRecord.item));
+    if (!this._collection)
+      this._collection = [];
 
-    this.requestMeasure();
+    let isMeasurementRequired = false;
+
+    let addedCount = 0;
+    changes.forEachOperation((item, adjustedPreviousIndex, currentIndex) => {
+      if (item.previousIndex == null) {
+        isMeasurementRequired = true;
+        this._collection.splice(currentIndex || 0, 0, item.item);
+        addedCount++;
+      } else if (currentIndex == null) {
+        isMeasurementRequired = true;
+        this._collection.splice(adjustedPreviousIndex || 0, 1);
+      } else {
+        this._collection.splice(currentIndex, 0, this._collection.splice(adjustedPreviousIndex || 0, 1)[0]);
+      }
+    });
+
+    changes.forEachIdentityChange((record: any) => {
+      this._collection[record.currentIndex] = record.item;
+    });
+
+    this._renderer.setStyle(this._infiniteList.listHolder?.nativeElement, 'height', `${this._collection.length * this.rowHeight}px`);
+    this._loading = false;
+
+    if (isMeasurementRequired)
+      this.requestMeasure();
+
+    this.requestLayout();
   }
 
   private requestMeasure() {
     if (this._isInMeasure || this._isInLayout) {
       clearTimeout(this._pendingMeasurement);
-      this._pendingMeasurement = window.setTimeout(this.requestMeasure, 60);
+      this._pendingMeasurement =
+        window.setTimeout(this.requestMeasure, 60);
       return;
     }
-
     this.measure();
-  }
-
-  private measure() {
-    this._isInMeasure = true;
-    this._isInMeasure = false;
-    // (this.virtualList.sentinel as EmbeddedViewRef<any>).rootNodes[0].style.transform = `translateY(${this.rowHeight * this._collection.length})`
-    this.requestLayout();
   }
 
   private requestLayout() {
     if (!this._isInMeasure && this.rowHeight)
-      this.constructLayout();
+      this.layout();
   }
 
-  private constructLayout() {
+  private measure() {
+    this._isInMeasure = true;
+
+    this._isInMeasure = false;
+    this.requestLayout();
+  }
+
+  private layout() {
     if (this._isInLayout) return;
 
     this._isInLayout = true;
-    this.getVisibleRange();
-    for (let i = 0; i < this.viewContainerRef.length; i++) {
-      let view = this.viewContainerRef.get(i) as EmbeddedViewRef<any>;
-      view.detach();
+
+    if (!this._collection || this._collection.length === 0) {
+      for (let i = 0; i < this._viewContainerRef.length; i++) {
+        this._viewContainerRef.detach(i);
+        i--;
+      }
+      this._isInLayout = false;
+      return;
     }
-    for (let i = this._startIndex; i < this._endIndex; i++) {
-      let view = this.viewContainerRef.createEmbeddedView(this.templateRef) as EmbeddedViewRef<any>;
-      view.context.$implicit = this._collection[i];
-      this.viewContainerRef.insert(view);
-      view.reattach();
-    }
+
+    this.findPositionInRange();
+    this.insertViews();
+
+    this._recycler.pruneScrapViews();
     this._isInLayout = false;
+    this._previousStartIndex = this._firstItemPosition;
+    this._previousEndIndex = this._lastItemPosition;
+    let remainder = this._scrollY - this._firstItemPosition * this.rowHeight;
+    for (let i = 0; i < this._viewContainerRef.length; i++) {
+      let view = this._viewContainerRef.get(i) as EmbeddedViewRef<any>;
+
+      view.rootNodes[0].style.position = `absolute`;
+      view.rootNodes[0].style.transform = `translateY(${i * this.rowHeight - remainder + this._scrollY}px)`
+    }
   }
 
-  private getVisibleRange() {
-    this._startIndex = Math.ceil(this._scrollY / this.rowHeight);
-    this._offset = this._scrollY % this.rowHeight;
-    this._endIndex = Math.ceil((this._scrollY + this.virtualList.height) / this.rowHeight);
+  insertViews() {
+    let isScrollUp = this._previousStartIndex > this._firstItemPosition || this._previousEndIndex > this._lastItemPosition;
+    let isScrollDown = this._previousStartIndex < this._firstItemPosition || this._previousEndIndex < this._lastItemPosition;
+    let isFastScroll = this._previousStartIndex > this._lastItemPosition || this._previousEndIndex < this._firstItemPosition;
 
+    if (isFastScroll) {
+      for (let i = 0; i < this._viewContainerRef.length; i++) {
+        let child = <EmbeddedViewRef<InfiniteRow>>this._viewContainerRef.get(i);
+        this._viewContainerRef.detach(i);
+        this._recycler.recycleView(child.context.index, child);
+        i--;
+      }
+      for (let i = this._firstItemPosition; i < this._lastItemPosition; i++) {
+        let view = this.getView(i);
+        this.dispatchLayout(view);
+      }
+    } else if (isScrollUp) {
+      for (let i = this._previousStartIndex - 1; i >= this._firstItemPosition; i--) {
+        let view = this.getView(i);
+        this.dispatchLayout(view, true);
+      }
+      for (let i = this._lastItemPosition; i < this._previousEndIndex; i++) {
+        let child = <EmbeddedViewRef<InfiniteRow>>this._viewContainerRef.get(this._viewContainerRef.length - 1);
+        this._viewContainerRef.detach(this._viewContainerRef.length - 1);
+        this._recycler.recycleView(child.context.index, child);
+      }
+    } else if (isScrollDown) {
+      for (let i = this._previousStartIndex; i < this._firstItemPosition; i++) {
+        let child = <EmbeddedViewRef<InfiniteRow>>this._viewContainerRef.get(0);
+        this._viewContainerRef.detach(0);
+        this._recycler.recycleView(child.context.index, child);
+      }
+      for (let i = this._previousEndIndex; i < this._lastItemPosition; i++) {
+        let view = this.getView(i);
+        this.dispatchLayout(view);
+      }
+    }
+  }
+
+  findPositionInRange() {
+    this._firstItemPosition = Math.max(0, Math.floor(this._scrollY / this.rowHeight));
+    this._lastItemPosition = Math.ceil((this._scrollY + this._infiniteList.height) / this.rowHeight);
+
+    if (!this._loading && this._lastItemPosition == this._collection.length) {
+      this.scrollEnd();
+      this._loading = true;
+    }
+  }
+
+
+  private getView(position: number): ViewRef {
+    let view = this._recycler.getView(position);
+    let item = this._collection[position];
+    let count = this._collection.length;
+    if (!view)
+      view = this._template.createEmbeddedView(new InfiniteRow(item, position, count));
+    else {
+      (view as EmbeddedViewRef<InfiniteRow>).context.$implicit = item;
+      (view as EmbeddedViewRef<InfiniteRow>).context.index = position;
+      (view as EmbeddedViewRef<InfiniteRow>).context.count = count;
+    }
+    return view;
+  }
+
+  // TODO: make default value for addBefore and remove unused arguments
+  private dispatchLayout(view: ViewRef, addBefore: boolean = false) {
+    if (addBefore)
+      this._viewContainerRef.insert(view, 0);
+    else
+      this._viewContainerRef.insert(view);
+
+    view.reattach();
   }
 }

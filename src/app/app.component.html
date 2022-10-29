@@ -1,9 +1,11 @@
 <virtual-list>
-  <article class="article fixed-height-article" *virtualForConstantHeight="let item of data; rowHeight: 134">
+  <article class="article fixed-height-article" *virtualForConstantHeight="
+    let item of data;
+    let i = index;
+    rowHeight: 134;
+    onScrollEnd: scrollEnd
+    ">
+    {{i}}
     {{item.text}}
   </article>
-  <!-- <article class="article" *ngFor="let item of data">
-    <img *ngIf="item.image" loading="lazy" class="image" [src]="item.image" />
-    {{item.text}}
-  </article> -->
 </virtual-list>

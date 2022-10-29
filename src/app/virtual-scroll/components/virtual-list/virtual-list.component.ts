@@ -8,7 +8,12 @@ import { BehaviorSubject, filter, fromEvent, map, Subscription } from 'rxjs';
 })
 export class VirtualListComponent implements AfterViewInit, OnDestroy {
   @ViewChild('listContainer') private _listContainer!: ElementRef;
+  @ViewChild('listHolder', { static: true }) private _listHolder!: ElementRef;
   @ViewChild('sentinel') private _sentinel!: ElementRef;
+
+  get listHolder(): ElementRef {
+    return this._listHolder;
+  }
 
   get sentinel(): ElementRef {
     return this._sentinel;
@@ -25,8 +30,11 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
   }
 
   private _subscription = new Subscription();
-  private _ignoreScrollEvent = false;
   private _scrollPositionSubject = new BehaviorSubject(-1);
+
+  private _ignoreScrollEvent = false;
+  private _containerWidth!: number;
+  private _containerHeight!: number;
 
   ngAfterViewInit(): void {
     this._subscription.add(
@@ -46,4 +54,15 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this._subscription.unsubscribe();
   }
+
+
+  measure(): { width: number, height: number } {
+    if (!this._listContainer || !this._listContainer.nativeElement) return { width: 0, height: 0 };
+
+    let rect = this._listContainer.nativeElement.getBoundingClientRect();
+    this._containerWidth = rect.width;
+    this._containerHeight = rect.height;
+    return { width: this._containerWidth, height: this._containerHeight };
+  }
+
 }

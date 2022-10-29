@@ -74,4 +74,8 @@ export class AppComponent implements OnInit {
 
     return result;
   }
+
+  scrollEnd() {
+    console.log('hello');
+  }
 }
