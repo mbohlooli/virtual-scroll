@@ -3,7 +3,7 @@ import { Subscription } from 'rxjs';
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
 import { Recycler } from './recycler';
 
-export class InfiniteRow {
+export class VirtualScrollItem {
   constructor(public $implicit: any, public index: number, public count: number) {
   }
 
@@ -39,7 +39,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
   }
 
   @Input('virtualForConstantHeightTemplate')
-  set template(value: TemplateRef<InfiniteRow>) {
+  set template(value: TemplateRef<VirtualScrollItem>) {
     if (value)
       this._template = value;
   }
@@ -72,9 +72,9 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
   private _previousEndIndex = 0;
 
   constructor(
-    private _infiniteList: VirtualListComponent,
+    private _virtualList: VirtualListComponent,
     private _differs: IterableDiffers,
-    private _template: TemplateRef<InfiniteRow>,
+    private _template: TemplateRef<VirtualScrollItem>,
     private _viewContainerRef: ViewContainerRef,
     private _renderer: Renderer2,
   ) { }
@@ -103,7 +103,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
   ngOnInit(): void {
     this._subscription.add(
-      this._infiniteList.scrollPosition$
+      this._virtualList.scrollPosition$
         .subscribe((scrollY) => {
           this._scrollY = scrollY;
           this.requestLayout();
@@ -141,7 +141,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
       this._collection[record.currentIndex] = record.item;
     });
 
-    this._renderer.setStyle(this._infiniteList.listHolder?.nativeElement, 'height', `${this._collection.length * this.rowHeight}px`);
+    this._renderer.setStyle(this._virtualList.listHolder?.nativeElement, 'height', `${this._collection.length * this.rowHeight}px`);
     this._loading = false;
 
     if (isMeasurementRequired)
@@ -209,7 +209,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
     if (isFastScroll) {
       for (let i = 0; i < this._viewContainerRef.length; i++) {
-        let child = <EmbeddedViewRef<InfiniteRow>>this._viewContainerRef.get(i);
+        let child = <EmbeddedViewRef<VirtualScrollItem>>this._viewContainerRef.get(i);
         this._viewContainerRef.detach(i);
         this._recycler.recycleView(child.context.index, child);
         i--;
@@ -224,13 +224,13 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
         this.dispatchLayout(view, true);
       }
       for (let i = this._lastItemPosition; i < this._previousEndIndex; i++) {
-        let child = <EmbeddedViewRef<InfiniteRow>>this._viewContainerRef.get(this._viewContainerRef.length - 1);
+        let child = <EmbeddedViewRef<VirtualScrollItem>>this._viewContainerRef.get(this._viewContainerRef.length - 1);
         this._viewContainerRef.detach(this._viewContainerRef.length - 1);
         this._recycler.recycleView(child.context.index, child);
       }
     } else if (isScrollDown) {
       for (let i = this._previousStartIndex; i < this._firstItemPosition; i++) {
-        let child = <EmbeddedViewRef<InfiniteRow>>this._viewContainerRef.get(0);
+        let child = <EmbeddedViewRef<VirtualScrollItem>>this._viewContainerRef.get(0);
         this._viewContainerRef.detach(0);
         this._recycler.recycleView(child.context.index, child);
       }
@@ -243,10 +243,11 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
   findPositionInRange() {
     this._firstItemPosition = Math.max(0, Math.floor(this._scrollY / this.rowHeight));
-    this._lastItemPosition = Math.ceil((this._scrollY + this._infiniteList.height) / this.rowHeight);
+    this._lastItemPosition = Math.ceil((this._scrollY + this._virtualList.height) / this.rowHeight);
 
     if (!this._loading && this._lastItemPosition == this._collection.length) {
-      this.scrollEnd();
+      // this.scrollEnd();
+      this._virtualList.onScrollEnd();
       this._loading = true;
     }
   }
@@ -257,11 +258,11 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     let item = this._collection[position];
     let count = this._collection.length;
     if (!view)
-      view = this._template.createEmbeddedView(new InfiniteRow(item, position, count));
+      view = this._template.createEmbeddedView(new VirtualScrollItem(item, position, count));
     else {
-      (view as EmbeddedViewRef<InfiniteRow>).context.$implicit = item;
-      (view as EmbeddedViewRef<InfiniteRow>).context.index = position;
-      (view as EmbeddedViewRef<InfiniteRow>).context.count = count;
+      (view as EmbeddedViewRef<VirtualScrollItem>).context.$implicit = item;
+      (view as EmbeddedViewRef<VirtualScrollItem>).context.index = position;
+      (view as EmbeddedViewRef<VirtualScrollItem>).context.count = count;
     }
     return view;
   }

@@ -55,6 +55,9 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
     this._subscription.unsubscribe();
   }
 
+  onScrollEnd() {
+    this.scrollEnd.emit();
+  }
 
   measure(): { width: number, height: number } {
     if (!this._listContainer || !this._listContainer.nativeElement) return { width: 0, height: 0 };

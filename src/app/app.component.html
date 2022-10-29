@@ -1,9 +1,8 @@
-<virtual-list>
+<virtual-list (scrollEnd)="scrollEnd()">
   <article class="article fixed-height-article" *virtualForConstantHeight="
     let item of data;
     let i = index;
-    rowHeight: 134;
-    onScrollEnd: scrollEnd
+    rowHeight: 134
     ">
     {{i}}
     {{item.text}}
