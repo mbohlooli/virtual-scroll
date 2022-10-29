@@ -44,10 +44,9 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
       this._template = value;
   }
 
-  // TODO: pass this to component and then get from it
-  @Input('virtualForConstantHeightOnScrollEnd') scrollEnd!: () => void;
-
   @Input('virtualForConstantHeightRowHeight') rowHeight!: number;
+
+  @Input('virtualForLimit') limit: number = 8;
 
   private _scrollY!: number;
 
@@ -59,6 +58,9 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
   private _firstItemPosition!: number;
   private _lastItemPosition!: number;
+
+  private _containerWidth!: number;
+  private _containerHeight!: number;
 
   private _isInLayout: boolean = false;
   private _isInMeasure: boolean = false;
@@ -110,6 +112,13 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
         })
     );
     // TODO: add Size change
+    this._subscription.add(
+      this._virtualList.sizeChange$.subscribe(([width, height]) => {
+        this._containerWidth = width;
+        this._containerHeight = height;
+        this.requestMeasure();
+      })
+    );
   }
 
   ngOnDestroy(): void {
@@ -123,12 +132,10 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
     let isMeasurementRequired = false;
 
-    let addedCount = 0;
     changes.forEachOperation((item, adjustedPreviousIndex, currentIndex) => {
       if (item.previousIndex == null) {
         isMeasurementRequired = true;
         this._collection.splice(currentIndex || 0, 0, item.item);
-        addedCount++;
       } else if (currentIndex == null) {
         isMeasurementRequired = true;
         this._collection.splice(adjustedPreviousIndex || 0, 1);
@@ -168,6 +175,8 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
   private measure() {
     this._isInMeasure = true;
 
+    this.calculateScrapViewsLimit();
+
     this._isInMeasure = false;
     this.requestLayout();
   }
@@ -176,6 +185,9 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     if (this._isInLayout) return;
 
     this._isInLayout = true;
+    let { width, height } = this._virtualList.measure();
+    this._containerWidth = width;
+    this._containerHeight = height;
 
     if (!this._collection || this._collection.length === 0) {
       for (let i = 0; i < this._viewContainerRef.length; i++) {
@@ -243,10 +255,9 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
   findPositionInRange() {
     this._firstItemPosition = Math.max(0, Math.floor(this._scrollY / this.rowHeight));
-    this._lastItemPosition = Math.ceil((this._scrollY + this._virtualList.height) / this.rowHeight);
+    this._lastItemPosition = Math.ceil((this._scrollY + Math.floor(this._containerHeight)) / this.rowHeight);
 
     if (!this._loading && this._lastItemPosition == this._collection.length) {
-      // this.scrollEnd();
       this._virtualList.onScrollEnd();
       this._loading = true;
     }
@@ -275,5 +286,9 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
       this._viewContainerRef.insert(view);
 
     view.reattach();
+  }
+
+  private calculateScrapViewsLimit() {
+    this._recycler.setScrapViewsLimit(this.limit);
   }
 }

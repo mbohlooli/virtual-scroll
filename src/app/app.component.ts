@@ -56,7 +56,7 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    for (let i = 0; i < 100; i++)
+    for (let i = 0; i < 10000; i++)
       this.data.push({
         index: i,
         text: this.generateRandomText(),

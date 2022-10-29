@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild, ViewRef } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, EventEmitter, OnDestroy, Output, ViewChild } from '@angular/core';
 import { BehaviorSubject, filter, fromEvent, map, Subscription } from 'rxjs';
 
 @Component({
@@ -10,6 +10,8 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
   @ViewChild('listContainer') private _listContainer!: ElementRef;
   @ViewChild('listHolder', { static: true }) private _listHolder!: ElementRef;
   @ViewChild('sentinel') private _sentinel!: ElementRef;
+
+  @Output('scrollEnd') private scrollEnd = new EventEmitter();
 
   get listHolder(): ElementRef {
     return this._listHolder;
@@ -23,6 +25,10 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
     return this._scrollPositionSubject.asObservable();
   }
 
+  get sizeChange$() {
+    return this._sizeChangeSubject.asObservable();
+  }
+
   get height(): number {
     return window.innerHeight;
     // const rect = this._listContainer.nativeElement.getBoundingClientRect();
@@ -31,6 +37,7 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
 
   private _subscription = new Subscription();
   private _scrollPositionSubject = new BehaviorSubject(-1);
+  private _sizeChangeSubject = new BehaviorSubject<number[]>([0, 0]);
 
   private _ignoreScrollEvent = false;
   private _containerWidth!: number;
@@ -49,6 +56,14 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
         map(() => this._listContainer.nativeElement.scrollTop)
       ).subscribe(scrollPositon => this._scrollPositionSubject.next(scrollPositon))
     );
+
+    if (window)
+      this._subscription.add(
+        fromEvent(window, 'resize')
+          .subscribe(() => this.requestMeasure())
+      );
+
+    setTimeout(() => this.requestMeasure());
   }
 
   ngOnDestroy(): void {
@@ -68,4 +83,9 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
     return { width: this._containerWidth, height: this._containerHeight };
   }
 
+
+  requestMeasure() {
+    let { width, height } = this.measure();
+    this._sizeChangeSubject.next([width, height]);
+  }
 }
