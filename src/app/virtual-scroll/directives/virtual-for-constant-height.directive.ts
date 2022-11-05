@@ -50,6 +50,8 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
   @Input('virtualForConstantHeightAbsolutePositioning') absolutePositioning: boolean = true;
 
+  @Input('virtualForConstantHeightColumns') columns: number = 1;
+
   private _scrollY!: number;
 
   private _differ!: IterableDiffer<T>;
@@ -260,8 +262,8 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
   }
 
   findPositionInRange() {
-    this._firstItemPosition = Math.max(0, Math.floor(this._scrollY / this.rowHeight));
-    this._lastItemPosition = Math.min(this._collection.length, Math.ceil((this._scrollY + Math.floor(this._containerHeight)) / this.rowHeight));
+    this._firstItemPosition = Math.max(0, Math.floor(this._scrollY / this.rowHeight) * this.columns);
+    this._lastItemPosition = Math.min(this._collection.length, Math.ceil((this._scrollY + Math.floor(this._containerHeight)) / this.rowHeight) * this.columns + this.columns - 1);
 
     if (!this._loading && this._lastItemPosition == this._collection.length) {
       this._virtualList.onScrollEnd();

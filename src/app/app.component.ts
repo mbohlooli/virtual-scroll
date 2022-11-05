@@ -76,12 +76,12 @@ export class AppComponent implements OnInit {
   }
 
   scrollEnd() {
-    for (let i = this.data.length; i < this.data.length + 10; i++)
-      this.data.push({
-        index: i,
-        text: this.generateRandomText(),
-        image: Math.random() > 0.8 ? this.randomImage : ''
-      });
+    // for (let i = this.data.length; i < this.data.length + 10; i++)
+    //   this.data.push({
+    //     index: i,
+    //     text: this.generateRandomText(),
+    //     image: Math.random() > 0.8 ? this.randomImage : ''
+    //   });
     console.log(this.data);
 
   }
