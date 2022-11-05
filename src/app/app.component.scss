@@ -23,3 +23,15 @@ $shadow-color: rgba(0, 0, 0, 0.1);
 .image {
   width: 100%;
 }
+
+::ng-deep {
+  .virtual-list-runway {
+    width: 100%;
+    height: 10000px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: rgb(236, 236, 236);
+  }
+}
