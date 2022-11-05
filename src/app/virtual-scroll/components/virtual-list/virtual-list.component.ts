@@ -1,5 +1,6 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, OnDestroy, Output, ViewChild } from '@angular/core';
-import { BehaviorSubject, filter, fromEvent, map, Subscription } from 'rxjs';
+import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, Output, ViewChild } from '@angular/core';
+import { BehaviorSubject, fromEvent, Subscription } from 'rxjs';
+import { map, filter } from "rxjs/operators";
 
 @Component({
   selector: 'virtual-list',
@@ -7,11 +8,13 @@ import { BehaviorSubject, filter, fromEvent, map, Subscription } from 'rxjs';
   styleUrls: ['./virtual-list.component.scss']
 })
 export class VirtualListComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('listContainer') private _listContainer!: ElementRef;
-  @ViewChild('listHolder', { static: true }) private _listHolder!: ElementRef;
-  @ViewChild('sentinel') private _sentinel!: ElementRef;
+  // @ViewChild('listContainer') private _listContainer!: ElementRef;
+  @Input('viewport') private viewport!: ElementRef;
 
   @Output('scrollEnd') private scrollEnd = new EventEmitter();
+
+  @ViewChild('listHolder', { static: true }) private _listHolder!: ElementRef;
+  @ViewChild('sentinel') private _sentinel!: ElementRef;
 
   get listHolder(): ElementRef {
     return this._listHolder;
@@ -42,10 +45,11 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
   private _ignoreScrollEvent = false;
   private _containerWidth!: number;
   private _containerHeight!: number;
+  private _scrollOffset: number = 0;
 
   ngAfterViewInit(): void {
     this._subscription.add(
-      fromEvent(this._listContainer.nativeElement, 'scroll').pipe(
+      fromEvent(this.viewport ? this.viewport.nativeElement : window, 'scroll').pipe(
         filter(() => {
           if (this._ignoreScrollEvent) {
             this._ignoreScrollEvent = false;
@@ -53,7 +57,14 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
           }
           return true;
         }),
-        map(() => this._listContainer.nativeElement.scrollTop)
+        map(() => {
+          if (this._scrollOffset == 0 && !this.viewport) {
+            let rect = this.listHolder.nativeElement.getBoundingClientRect();
+            this._scrollOffset = rect.top;
+          }
+
+          return (this.viewport ? this.viewport.nativeElement.scrollTop : window.scrollY - this._scrollOffset);
+        })
       ).subscribe(scrollPositon => this._scrollPositionSubject.next(scrollPositon))
     );
 
@@ -75,11 +86,15 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
   }
 
   measure(): { width: number, height: number } {
-    if (!this._listContainer || !this._listContainer.nativeElement) return { width: 0, height: 0 };
+    if (this.viewport) {
+      let rect = this.viewport.nativeElement.getBoundingClientRect();
+      this._containerWidth = rect.width;
+      this._containerHeight = rect.height;
+    } else {
+      this._containerWidth = window.innerWidth;
+      this._containerHeight = window.innerHeight;
+    }
 
-    let rect = this._listContainer.nativeElement.getBoundingClientRect();
-    this._containerWidth = rect.width;
-    this._containerHeight = rect.height;
     return { width: this._containerWidth, height: this._containerHeight };
   }
 
