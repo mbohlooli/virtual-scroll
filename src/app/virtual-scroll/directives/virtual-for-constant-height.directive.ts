@@ -46,7 +46,9 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
   @Input('virtualForConstantHeightRowHeight') rowHeight!: number;
 
-  @Input('virtualForLimit') limit: number = 8;
+  @Input('virtualForConstantHeightLimit') limit: number = 8;
+
+  @Input('virtualForConstantHeightAbsolutePositioning') absolutePositioning: boolean = true;
 
   private _scrollY!: number;
 
@@ -211,9 +213,10 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     for (let i = 0; i < this._viewContainerRef.length; i++) {
       let view = this._viewContainerRef.get(i) as EmbeddedViewRef<any>;
 
-      //TODO: use the translateX and make a nice grid
-      view.rootNodes[0].style.position = `absolute`;
-      view.rootNodes[0].style.transform = `translateY(${i * this.rowHeight - remainder + this._scrollY}px)`
+      if (this.absolutePositioning) {
+        view.rootNodes[0].style.position = `absolute`;
+        view.rootNodes[0].style.transform = `translateY(${i * this.rowHeight - remainder + this._scrollY}px)`
+      }
     }
   }
 
