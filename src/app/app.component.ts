@@ -56,12 +56,14 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    for (let i = 0; i < 100; i++)
-      this.data.push({
-        index: i,
-        text: this.generateRandomText(),
-        image: Math.random() > 0.8 ? this.randomImage : ''
-      });
+    setTimeout(() => {
+      for (let i = 0; i < 100; i++)
+        this.data.push({
+          index: i,
+          text: this.generateRandomText(),
+          image: Math.random() > 0.8 ? this.randomImage : ''
+        });
+    }, 2000);
   }
 
   generateRandomText() {
@@ -84,5 +86,9 @@ export class AppComponent implements OnInit {
     //   });
     console.log(this.data);
 
+  }
+
+  getHeight() {
+    return 200;
   }
 }

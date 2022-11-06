@@ -1,13 +1,20 @@
-import { Directive, EmbeddedViewRef, Input, isDevMode, IterableChanges, IterableDiffer, IterableDiffers, NgIterable, Renderer2, SimpleChanges, TemplateRef, TrackByFunction, ViewContainerRef, ViewRef } from '@angular/core';
+import { Directive, DoCheck, EmbeddedViewRef, Input, isDevMode, IterableChanges, IterableDiffer, IterableDiffers, NgIterable, OnChanges, OnDestroy, OnInit, Renderer2, SimpleChanges, TemplateRef, TrackByFunction, ViewContainerRef, ViewRef } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
 import { Recycler } from './recycler';
 import { VirtualListItem } from './virtual-for-constant-height.directive';
 
+function sum(arr: number[]) {
+  let result = 0;
+  for (let i = 0; i < arr.length; i++)
+    result += arr[i];
+  return result;
+}
+
 @Directive({
   selector: '[virtualFor][virtualForOf]'
 })
-export class VirtualForDirective<T> {
+export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDestroy {
   @Input('virtualForOf') data!: NgIterable<T>;
 
   @Input('virtualForTrackBy')
@@ -24,9 +31,13 @@ export class VirtualForDirective<T> {
       this._template = value;
   }
 
-  @Input('virtualForHeightFn') getHeight!: (index: number) => number;
+  @Input('virtualForHeightFn') heightFn!: (index: number) => number;
 
-  @Input('virtualForLimit') limit: number = 8;
+  @Input('virtualForLimit') limit = 8;
+
+  @Input('virtualForOnScrollEnd') scrollEnd!: () => void;
+
+  @Input('virtualForItemSize') itemSize: number | undefined;
 
   private _scrollY!: number;
 
@@ -35,6 +46,8 @@ export class VirtualForDirective<T> {
   private _subscription: Subscription = new Subscription();
 
   private _collection!: any[];
+  private _heights: number[] = [];
+  private _positions: number[] = [];
 
   private _firstItemPosition!: number;
   private _lastItemPosition!: number;
@@ -42,8 +55,13 @@ export class VirtualForDirective<T> {
   private _containerWidth!: number;
   private _containerHeight!: number;
 
+  private _paddingTop: number = 0;
+  private _paddingBottom: number = 0;
+  private _averageHeight: number = 0;
+
   private _isInLayout: boolean = false;
   private _isInMeasure: boolean = false;
+  private _invalidate: boolean = true;
 
   private _pendingMeasurement!: number;
   private _loading = false;
@@ -52,8 +70,6 @@ export class VirtualForDirective<T> {
 
   private _previousStartIndex = 0;
   private _previousEndIndex = 0;
-
-  private _offset = 0;
 
   constructor(
     private _virtualList: VirtualListComponent,
@@ -114,10 +130,12 @@ export class VirtualForDirective<T> {
 
     let isMeasurementRequired = false;
 
+    let addedCount = 0;
     changes.forEachOperation((item, adjustedPreviousIndex, currentIndex) => {
       if (item.previousIndex == null) {
         isMeasurementRequired = true;
         this._collection.splice(currentIndex || 0, 0, item.item);
+        addedCount++;
       } else if (currentIndex == null) {
         isMeasurementRequired = true;
         this._collection.splice(adjustedPreviousIndex || 0, 1);
@@ -130,7 +148,22 @@ export class VirtualForDirective<T> {
       this._collection[record.currentIndex] = record.item;
     });
 
-    // TODO: move the sentinel to an appropiate position
+    if (!this.itemSize) {
+      let position = 0;
+      for (let i = 0; i < this._collection.length; i++) {
+        this._heights[i] = this.heightFn(this._collection[i]);
+        this._positions[i] = position;
+        position += this._heights[i];
+        isMeasurementRequired = true;
+      }
+      this._averageHeight = Math.floor(sum(this._heights) / this._heights.length);
+    } else {
+      this._averageHeight = this.itemSize;
+    }
+
+    this._paddingBottom += this._averageHeight * addedCount;
+    this._renderer.setStyle(this._virtualList.listHolder?.nativeElement, "padding-bottom", `${this._paddingBottom}px`);
+
     this._loading = false;
 
     if (isMeasurementRequired)
@@ -150,7 +183,7 @@ export class VirtualForDirective<T> {
   }
 
   private requestLayout() {
-    if (!this._isInMeasure)
+    if (!this._isInMeasure && ((this._heights && this._heights.length !== 0) || this.itemSize))
       this.layout();
   }
 
@@ -158,8 +191,8 @@ export class VirtualForDirective<T> {
     this._isInMeasure = true;
 
     this.calculateScrapViewsLimit();
-
     this._isInMeasure = false;
+    this._invalidate = true;
     this.requestLayout();
   }
 
@@ -177,6 +210,7 @@ export class VirtualForDirective<T> {
         i--;
       }
       this._isInLayout = false;
+      this._invalidate = false;
       return;
     }
 
@@ -185,17 +219,12 @@ export class VirtualForDirective<T> {
 
     this._recycler.pruneScrapViews();
     this._isInLayout = false;
+    this._invalidate = false;
     this._previousStartIndex = this._firstItemPosition;
     this._previousEndIndex = this._lastItemPosition;
 
-    // TODO: set the true positions
-    // let remainder = this._scrollY - (this._firstItemPosition / this._columns) * this._rowHeight;
-    // for (let i = 0; i < this._viewContainerRef.length; i++) {
-    //   let view = this._viewContainerRef.get(i) as EmbeddedViewRef<any>;
-
-    //   view.rootNodes[0].style.position = `absolute`;
-    //   view.rootNodes[0].style.transform = `translateY(${Math.floor(i / this._columns) * this._rowHeight - remainder + this._scrollY}px)`;
-    // }
+    this._renderer.setStyle(this._virtualList.listHolder?.nativeElement, 'padding-top', `${this._paddingTop}px`);
+    this._renderer.setStyle(this._virtualList.listHolder?.nativeElement, 'padding-bottom', `${this._paddingBottom}px`);
   }
 
   insertViews() {
@@ -203,7 +232,6 @@ export class VirtualForDirective<T> {
     let isScrollDown = this._previousStartIndex < this._firstItemPosition || this._previousEndIndex < this._lastItemPosition;
     let isFastScroll = this._previousStartIndex > this._lastItemPosition || this._previousEndIndex < this._firstItemPosition;
 
-    // TODO: set the offsets
     if (isFastScroll) {
       for (let i = 0; i < this._viewContainerRef.length; i++) {
         let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(i);
@@ -215,47 +243,66 @@ export class VirtualForDirective<T> {
         let view = this.getView(i);
         this.dispatchLayout(view);
       }
-      // this._offset = (this._firstItemPosition / this._columns) * this._rowHeight;
+      this._paddingTop = (this.itemSize) ? this.itemSize * this._firstItemPosition : sum(this._heights.slice(0, this._firstItemPosition));
+      this._paddingBottom = this._averageHeight * (this._collection.length - this._lastItemPosition);
     } else if (isScrollUp) {
       for (let i = this._previousStartIndex - 1; i >= this._firstItemPosition; i--) {
         let view = this.getView(i);
         this.dispatchLayout(view, true);
-        // this._offset -= this._rowHeight / this._columns;
+        this._paddingTop -= (this.itemSize) ? this.itemSize : this._heights[i];
       }
       for (let i = this._lastItemPosition; i < this._previousEndIndex; i++) {
         let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(this._viewContainerRef.length - 1);
         this._viewContainerRef.detach(this._viewContainerRef.length - 1);
+        this._paddingBottom += this._averageHeight;
         this._recycler.recycleView(child.context.index, child);
       }
     } else if (isScrollDown) {
       for (let i = this._previousStartIndex; i < this._firstItemPosition; i++) {
         let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(0);
         this._viewContainerRef.detach(0);
-        // this._offset += this._rowHeight / this._columns;
+        this._paddingTop += (this.itemSize) ? this.itemSize : this._heights[i];
         this._recycler.recycleView(child.context.index, child);
       }
       for (let i = this._previousEndIndex; i < this._lastItemPosition; i++) {
         let view = this.getView(i);
         this.dispatchLayout(view);
+        this._paddingBottom -= this._averageHeight;
       }
-    }
-    for (let i = 0; i < this._viewContainerRef.length; i++) {
-      let view = this._viewContainerRef.get(i) as EmbeddedViewRef<any>;
-      view.rootNodes[0].style.transform = `translateY(${this._offset}px)`
     }
   }
 
   findPositionInRange() {
-    // TODO: calculate the visible range based on the dynamic heights
-    // this._firstItemPosition = Math.max(0, Math.floor(this._scrollY / this._rowHeight) * this._columns);
-    // this._lastItemPosition = Math.min(this._collection.length, Math.ceil((this._scrollY + Math.floor(this._containerHeight)) / this._rowHeight) * this._columns);
+    if (!this.itemSize) {
+      this._firstItemPosition = this.findFirstGreaterOrEqual(this._scrollY, 0, this._positions.length);
+      this._lastItemPosition = this.findFirstGreaterOrEqual(this._scrollY + window.innerHeight, this._firstItemPosition, this._positions.length);
+    } else {
+      this._firstItemPosition = Math.floor(this._scrollY / this.itemSize);
+      this._lastItemPosition = Math.ceil((this._scrollY + window.innerHeight) / this.itemSize);
+    }
 
-    // if (!this._loading && this._lastItemPosition == this._collection.length) {
-    //   this._virtualList.onScrollEnd();
-    //   this._loading = true;
-    // }
+    this._firstItemPosition = Math.max(this._firstItemPosition - 1, 0);
+    this._lastItemPosition = Math.min(this._lastItemPosition + 1, this._collection.length);
+
+    if (!this._loading && this._lastItemPosition == this._collection.length) {
+      this.scrollEnd();
+      this._loading = true;
+    }
   }
 
+  findFirstGreaterOrEqual(value: number, start: number, end: number): number {
+    if (start > end) return end;
+
+    let mid = Math.floor((start + end) / 2);
+    if (mid == 0) return 0;
+
+    if (this._positions[mid - 1] < value && this._positions[mid] >= value) return mid;
+
+    if (this._positions[mid] > value)
+      return this.findFirstGreaterOrEqual(value, start, mid - 1);
+
+    return this.findFirstGreaterOrEqual(value, mid + 1, end);
+  }
 
   private getView(position: number): ViewRef {
     let view = this._recycler.getView(position);
@@ -271,6 +318,7 @@ export class VirtualForDirective<T> {
     return view;
   }
 
+  // TODO: make default value for addBefore and remove unused arguments
   private dispatchLayout(view: ViewRef, addBefore: boolean = false) {
     if (addBefore)
       this._viewContainerRef.insert(view, 0);
