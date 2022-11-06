@@ -1,8 +1,7 @@
 <virtual-list (scrollEnd)="scrollEnd()">
-  <article class="article fixed-height-article" *virtualForConstantHeight="
+  <article class="article" *ngFor="
     let item of data;
     let i = index;
-    rowHeight: 134;
     ">
     {{i}}
     {{item.text}}
