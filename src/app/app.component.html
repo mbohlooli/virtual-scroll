@@ -1,16 +1,19 @@
 <virtual-list (scrollEnd)="scrollEnd()">
-  <article class="article" *virtualFor="
-  let item of data;
-  let i = index;
-  heightFn: getHeight;
-  onScrollEnd: scrollEnd
-    ">
-    {{i}}
-    <div *ngIf="item.image" class="image-container">
-      <img [src]="item.image">
-    </div>
-    {{item.text}}
-  </article>
+  <div *virtualFor="
+    let item of data;
+    let i = index;
+    heightFn: getHeight;
+    tombstone: tombstone;
+    tomstoneHeight: 100
+  ">
+    <article class="article">
+      {{i}}
+      <div *ngIf="item.image" class="image-container">
+        <img [src]="item.image">
+      </div>
+      {{item.text}}
+    </article>
+  </div>
 </virtual-list>
 
 <ng-template #tombstone>

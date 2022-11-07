@@ -8,7 +8,6 @@ import { map, filter } from "rxjs/operators";
   styleUrls: ['./virtual-list.component.scss']
 })
 export class VirtualListComponent implements AfterViewInit, OnDestroy {
-  // @ViewChild('listContainer') private _listContainer!: ElementRef;
   @Input('viewport') private viewport!: ElementRef;
 
   @Output('scrollEnd') private scrollEnd = new EventEmitter();
@@ -34,8 +33,6 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
 
   get height(): number {
     return window.innerHeight;
-    // const rect = this._listContainer.nativeElement.getBoundingClientRect();
-    // return rect.height;
   }
 
   private _subscription = new Subscription();

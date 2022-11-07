@@ -57,7 +57,7 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     setTimeout(() => {
-      for (let i = 0; i < 100; i++)
+      for (let i = 0; i < 1000; i++)
         this.data.push({
           index: i,
           text: this.generateRandomText(),
@@ -88,7 +88,11 @@ export class AppComponent implements OnInit {
 
   }
 
-  getHeight() {
-    return 200;
+
+  getHeight = (item: { index: number, text: string, image: string }) => {
+    if (item.image)
+      return 400;
+
+    return 100;
   }
 }
