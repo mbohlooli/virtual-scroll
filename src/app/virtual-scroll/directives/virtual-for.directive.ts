@@ -1,6 +1,7 @@
 import { Directive, DoCheck, EmbeddedViewRef, Input, isDevMode, IterableChanges, IterableDiffer, IterableDiffers, NgIterable, OnChanges, OnDestroy, OnInit, Renderer2, SimpleChanges, TemplateRef, TrackByFunction, ViewContainerRef, ViewRef } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
+import { ScrollState } from '../scroll-state';
 import { Recycler } from './recycler';
 import { VirtualListItem } from './virtual-for-constant-height.directive';
 
@@ -9,6 +10,11 @@ function sum(arr: number[]) {
   for (let i = 0; i < arr.length; i++)
     result += arr[i];
   return result;
+}
+
+interface AnchorItem {
+  index: number;
+  offset: number;
 }
 
 @Directive({
@@ -42,6 +48,7 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
   @Input('virtualForTombstoneHeight') tombstoneHeight: number = 100;
 
   private _scrollY!: number;
+  private _previousScrollY = 0;
 
   private _differ!: IterableDiffer<T>;
   private _trackByFn!: TrackByFunction<T>;
@@ -64,6 +71,8 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
 
   private _previousStartIndex = 0;
   private _previousEndIndex = 0;
+
+  private _currentScrollState = ScrollState.Idle;
 
   constructor(
     private _virtualList: VirtualListComponent,
@@ -96,7 +105,6 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
   }
 
   ngOnInit(): void {
-    console.log('tombstone', this.tombstone, this.tombstoneHeight);
     this._subscription.add(
       this._virtualList.scrollPosition$
         .subscribe((scrollY) => {
@@ -107,6 +115,10 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
 
     this._subscription.add(
       this._virtualList.sizeChange$.subscribe(() => this.requestMeasure())
+    );
+
+    this._subscription.add(
+      this._virtualList.scrollStateChange$.subscribe(state => this._currentScrollState = state)
     );
   }
 
@@ -191,6 +203,8 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
     let isFastScroll = this._previousStartIndex > this._lastItemPosition || this._previousEndIndex < this._firstItemPosition;
 
     if (isFastScroll) {
+      console.log('Fast scrolled');
+
       // TODO: 1- insert some tombstones first based on the scrollTop
       // TODO: 2- start from the previous last index to current first index and insert items one by one and update their positions then detach
       // TODO: 3- insert from first index to last index and update the positions just like scroll down
@@ -230,50 +244,46 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
       }
     }
 
-    if (isScrollDown) {
-      let pos = sum(this._heights.slice(0, this._firstItemPosition));
-      for (let i = this._firstItemPosition; i < this._lastItemPosition; i++) {
-        let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(i - this._firstItemPosition);
-        if (!child) continue;
-        this._positions[i] = pos;
-        child.rootNodes[0].style.transform = `translateY(${pos}px)`;
-        pos += child.rootNodes[0].offsetHeight ? child.rootNodes[0].offsetHeight : this._heights[i];
-        this._heights[i] = child.rootNodes[0].offsetHeight ? child.rootNodes[0].offsetHeight : this._heights[i];
-      }
-
-      this._renderer.setStyle(this._virtualList.sentinel.nativeElement, 'transform', `translateY(${sum(this._heights)}px)`);
-    } else if (isScrollUp) {
-      for (let i = this._firstItemPosition; i < this._lastItemPosition; i++) {
-        let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(i - this._firstItemPosition);
-        if (!child) continue;
-        child.rootNodes[0].style.transform = `translateY(${this._positions[i]}px)`;
-      }
-    } else if (isFastScroll) {
-
-
-    }
 
     for (let i = 0; i < this._viewContainerRef.length; i++) {
       let view = this._viewContainerRef.get(i) as EmbeddedViewRef<VirtualListItem>;
-      if (view.context.index >= this._lastItemPosition || view.context.index < this._firstItemPosition) {
-        view.detach();
-        this._recycler.recycleView(view.context.index, view);
-      }
+      if (view.context.index >= this._firstItemPosition && view.context.index < this._lastItemPosition) continue;
+      view.detach();
+      this._recycler.recycleView(view.context.index, view);
     }
 
     // TODO: make scrolltop better
     // TODO: fix the fast scrolling
     // TODO: fix the fliker at start
     // TODO: anchor item
+    this.positionViews();
     if (this._scrollY <= 0) {
       for (let i = 0; i < this._viewContainerRef.length; i++) {
         let view = this._viewContainerRef.get(i) as EmbeddedViewRef<VirtualListItem>;
         view.rootNodes[0].style.position = 'static';
-        view.rootNodes[0].style.transform = 'none';
+        view.rootNodes[0].style.transform = 'translateY(0)';
       }
     }
 
-    console.log(this._positions)
+    this._previousScrollY = this._scrollY;
+  }
+
+  positionViews() {
+
+
+    let isScrollDown = this._previousStartIndex < this._firstItemPosition || this._previousEndIndex < this._lastItemPosition;
+
+    let pos = sum(this._heights.slice(0, this._firstItemPosition));
+    for (let i = this._firstItemPosition; i < this._lastItemPosition; i++) {
+      let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(i - this._firstItemPosition);
+      if (!child) continue;
+      if (isScrollDown) {
+        this._positions[i] = pos;
+        pos += child.rootNodes[0].offsetHeight ? child.rootNodes[0].offsetHeight : this._heights[i];
+        this._heights[i] = child.rootNodes[0].offsetHeight ? child.rootNodes[0].offsetHeight : this._heights[i];
+      }
+      child.rootNodes[0].style.transform = `translateY(${this._positions[i]}px)`;
+    }
   }
 
   findPositionInRange() {
@@ -281,9 +291,10 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
       this._previousStartIndex = this._firstItemPosition;
       this._previousEndIndex = this._lastItemPosition;
     }
+
     this._firstItemPosition = this.findFirstGreaterOrEqual(this._scrollY, 0, this._positions.length);
     this._lastItemPosition = this.findFirstGreaterOrEqual(this._scrollY + window.innerHeight, this._firstItemPosition, this._positions.length);
-    // ! OR maybe here
+
     this._firstItemPosition = Math.max(this._firstItemPosition - this.additionalItemsToRender, 0);
     this._lastItemPosition = Math.min(this._lastItemPosition + this.additionalItemsToRender, this._collection.length);
 
@@ -293,6 +304,7 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
     }
   }
 
+  //TODO: move this to utils
   findFirstGreaterOrEqual(value: number, start: number, end: number): number {
     if (start > end) return end;
 
@@ -308,17 +320,18 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
   }
 
   private getView(position: number): ViewRef {
-    let view = this._recycler.getView(position);
+    let view = this._recycler.getView(position) as EmbeddedViewRef<VirtualListItem>;
     let item = this._collection[position];
     let count = this._collection.length;
     if (!view)
       view = this._template.createEmbeddedView(new VirtualListItem(item, position, count));
     else {
-      (view as EmbeddedViewRef<VirtualListItem>).context.$implicit = item;
-      (view as EmbeddedViewRef<VirtualListItem>).context.index = position;
-      (view as EmbeddedViewRef<VirtualListItem>).context.count = count;
+      view.context.$implicit = item;
+      view.context.index = position;
+      view.context.count = count;
     }
-    (view as EmbeddedViewRef<VirtualListItem>).rootNodes[0].style.position = 'absolute';
+
+    view.rootNodes[0].style.position = 'absolute';
     return view;
   }
 

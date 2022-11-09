@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, Output, ViewChild } from '@angular/core';
 import { BehaviorSubject, fromEvent, Subscription } from 'rxjs';
-import { map, filter } from "rxjs/operators";
+import { map, filter, tap, debounceTime } from "rxjs/operators";
+import { ScrollState } from '../../scroll-state';
 
 @Component({
   selector: 'virtual-list',
@@ -31,18 +32,24 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
     return this._sizeChangeSubject.asObservable();
   }
 
+  get scrollStateChange$() {
+    return this._scrollStateChangeSubject.asObservable();
+  }
+
   get height(): number {
     return window.innerHeight;
   }
 
   private _subscription = new Subscription();
-  private _scrollPositionSubject = new BehaviorSubject(-1);
+  private _scrollPositionSubject = new BehaviorSubject<number>(-1);
   private _sizeChangeSubject = new BehaviorSubject<number[]>([0, 0]);
+  private _scrollStateChangeSubject = new BehaviorSubject<ScrollState>(ScrollState.Idle);
 
   private _ignoreScrollEvent = false;
   private _containerWidth!: number;
   private _containerHeight!: number;
   private _scrollOffset: number = 0;
+  private _currentScrollState: ScrollState = ScrollState.Idle;
 
   ngAfterViewInit(): void {
     this._subscription.add(
@@ -70,6 +77,21 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
         fromEvent(window, 'resize')
           .subscribe(() => this.requestMeasure())
       );
+
+    this._subscription.add(
+      this._scrollPositionSubject.pipe(
+        tap(() => {
+          if (this._currentScrollState !== ScrollState.Idle) return;
+          this._currentScrollState = ScrollState.Scrolling;
+          this._scrollStateChangeSubject.next(this._currentScrollState);
+        }),
+        debounceTime(200),
+      ).subscribe(() => {
+        if (this._currentScrollState !== ScrollState.Scrolling) return;
+        this._currentScrollState = ScrollState.Idle;
+        this._scrollStateChangeSubject.next(this._currentScrollState);
+      })
+    );
 
     setTimeout(() => this.requestMeasure());
   }
