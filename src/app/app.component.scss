@@ -1,17 +1,18 @@
-$white: #fff;
-$text-color: #333;
+$article-background: rgb(20, 20, 20);
+$text-color: rgb(198, 198, 198);
 $shadow-color: rgba(0, 0, 0, 0.1);
 
 .article {
   padding: 7px 10px;
   color: $text-color;
-  background: $white;
+  background: $article-background;
   box-shadow: 0 3px 2px $shadow-color;
   position: relative;
   max-width: 420px;
   width: 100%;
   min-width: 80px;
   margin: 10px 5px;
+  border-radius: 10px;
   word-wrap: break-word;
 }
 

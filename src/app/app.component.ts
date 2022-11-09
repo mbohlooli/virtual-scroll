@@ -57,7 +57,7 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     setTimeout(() => {
-      for (let i = 0; i < 1000; i++)
+      for (let i = 0; i < 100; i++)
         this.data.push({
           index: i,
           text: this.generateRandomText(),
@@ -78,13 +78,16 @@ export class AppComponent implements OnInit {
   }
 
   scrollEnd() {
-    // for (let i = this.data.length; i < this.data.length + 10; i++)
-    //   this.data.push({
-    //     index: i,
-    //     text: this.generateRandomText(),
-    //     image: Math.random() > 0.8 ? this.randomImage : ''
-    //   });
-    console.log(this.data);
+    if (this.data.length >= 200) return;
+    setTimeout(() => {
+      for (let i = 0; i < 10; i++)
+        this.data.push({
+          index: i,
+          text: this.generateRandomText(),
+          image: Math.random() > 0.8 ? this.randomImage : ''
+        });
+    }, 1000);
+    // console.log(this.data);
 
   }
 

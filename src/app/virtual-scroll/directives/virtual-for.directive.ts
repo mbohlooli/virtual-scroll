@@ -141,7 +141,7 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
       position += this.heightFn(item);
     });
 
-    this._renderer.setStyle(this._virtualList.sentinel.nativeElement, 'transform', `translateY(${sum(this._heights)}px)`);
+    this._renderer.setStyle(this._virtualList.sentinel.nativeElement, 'transform', `translateY(${this._positions[this._positions.length - 1]}px)`);
 
     this._loading = false;
 
