@@ -3,6 +3,8 @@ import { BrowserModule } from '@angular/platform-browser';
 
 import { AppComponent } from './app.component';
 import { VirtualScrollModule } from './virtual-scroll/virtual-scroll.module';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
 
 @NgModule({
   declarations: [
@@ -10,7 +12,9 @@ import { VirtualScrollModule } from './virtual-scroll/virtual-scroll.module';
   ],
   imports: [
     BrowserModule,
-    VirtualScrollModule
+    VirtualScrollModule,
+    BrowserAnimationsModule,
+    MatProgressSpinnerModule
   ],
   providers: [],
   bootstrap: [AppComponent]

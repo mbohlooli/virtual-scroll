@@ -1,12 +1,10 @@
 <virtual-list (scrollEnd)="scrollEnd()">
-  <div *virtualFor="
+  <div *virtualForConstantHeight="
     let item of data;
     let i = index;
-    heightFn: getHeight;
-    tombstone: tombstone;
-    tombstoneHeight: 114
+    rowHeight: 134
   ">
-    <article class="article">
+    <article class="article fixed-height-article">
       {{i}}
       <div *ngIf="item.image" class="image-container">
         <img [src]="item.image">
@@ -15,6 +13,10 @@
     </article>
   </div>
 </virtual-list>
+
+<div class="loader" *ngIf="loading">
+  <mat-spinner></mat-spinner>
+</div>
 
 <ng-template #tombstone>
   <article class="article fixed-height-article"></article>

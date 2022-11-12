@@ -32,6 +32,14 @@ $shadow-color: rgba(0, 0, 0, 0.1);
   justify-content: center;
 }
 
+.loader {
+  height: 134px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 ::ng-deep {
   .virtual-list-runway {
     width: 100%;

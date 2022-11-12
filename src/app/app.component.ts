@@ -51,6 +51,8 @@ export class AppComponent implements OnInit {
     '../assets/images/image40.jpg',
   ];
 
+  loading = true;
+
   get randomImage() {
     return this.images[Math.floor(Math.random() * this.images.length)]
   }
@@ -63,6 +65,7 @@ export class AppComponent implements OnInit {
           text: this.generateRandomText(),
           image: Math.random() > 0.8 ? this.randomImage : ''
         });
+      this.loading = false;
     }, 2000);
   }
 
@@ -79,6 +82,7 @@ export class AppComponent implements OnInit {
 
   scrollEnd() {
     if (this.data.length >= 200) return;
+    this.loading = true;
     setTimeout(() => {
       for (let i = 0; i < 10; i++)
         this.data.push({
@@ -86,6 +90,7 @@ export class AppComponent implements OnInit {
           text: this.generateRandomText(),
           image: Math.random() > 0.8 ? this.randomImage : ''
         });
+      this.loading = false;
     }, 1000);
     // console.log(this.data);
 
