@@ -1,19 +1,35 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, Output, ViewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  Output,
+  ViewChild
+} from '@angular/core';
 import { BehaviorSubject, fromEvent, Subscription } from 'rxjs';
 import { map, filter, tap, debounceTime } from "rxjs/operators";
 import { ScrollState } from '../../scroll-state';
 
+/**
+ * Wrapper for a virtual list
+ * used with virtualForConstantHeight or virtualFor directives
+ * pass the required info and elements of dom to the directive
+ */
 @Component({
   selector: 'virtual-list',
   templateUrl: './virtual-list.component.html',
   styleUrls: ['./virtual-list.component.scss']
 })
 export class VirtualListComponent implements AfterViewInit, OnDestroy {
+  // The viewport for list (default: window) 
   @Input('viewport') private viewport!: ElementRef;
-
+  // Raised when user scrolls to the end of list
   @Output('scrollEnd') private scrollEnd = new EventEmitter();
-
+  // The runway containing list items
   @ViewChild('listHolder', { static: true }) private _listHolder!: ElementRef;
+  // A tiny div that moves along Y axis, simulating the total scroll height
   @ViewChild('sentinel') private _sentinel!: ElementRef;
 
   get listHolder(): ElementRef {
@@ -36,31 +52,20 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
     return this._scrollStateChangeSubject.asObservable();
   }
 
-  get height(): number {
-    return window.innerHeight;
-  }
-
   private _subscription = new Subscription();
   private _scrollPositionSubject = new BehaviorSubject<number>(-1);
   private _sizeChangeSubject = new BehaviorSubject<number[]>([0, 0]);
   private _scrollStateChangeSubject = new BehaviorSubject<ScrollState>(ScrollState.Idle);
 
-  private _ignoreScrollEvent = false;
   private _containerWidth!: number;
   private _containerHeight!: number;
   private _scrollOffset: number = 0;
   private _currentScrollState: ScrollState = ScrollState.Idle;
 
+  // Listening to scroll events and size changes
   ngAfterViewInit(): void {
     this._subscription.add(
       fromEvent(this.viewport ? this.viewport.nativeElement : window, 'scroll').pipe(
-        filter(() => {
-          if (this._ignoreScrollEvent) {
-            this._ignoreScrollEvent = false;
-            return false;
-          }
-          return true;
-        }),
         map(() => {
           if (this._scrollOffset == 0 && !this.viewport) {
             let rect = this.listHolder.nativeElement.getBoundingClientRect();
@@ -104,6 +109,7 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
     this.scrollEnd.emit();
   }
 
+  // get the viewport dimensions
   measure(): { width: number, height: number } {
     if (this.viewport) {
       let rect = this.viewport.nativeElement.getBoundingClientRect();
@@ -116,7 +122,6 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
 
     return { width: this._containerWidth, height: this._containerHeight };
   }
-
 
   requestMeasure() {
     let { width, height } = this.measure();

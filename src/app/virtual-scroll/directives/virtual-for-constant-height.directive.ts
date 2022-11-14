@@ -1,4 +1,23 @@
-import { Directive, DoCheck, EmbeddedViewRef, Input, isDevMode, IterableChanges, IterableDiffer, IterableDiffers, NgIterable, OnChanges, OnDestroy, OnInit, Renderer2, SimpleChanges, TemplateRef, TrackByFunction, ViewContainerRef, ViewRef } from '@angular/core';
+import {
+  Directive,
+  DoCheck,
+  EmbeddedViewRef,
+  Input,
+  isDevMode,
+  IterableChanges,
+  IterableDiffer,
+  IterableDiffers,
+  NgIterable,
+  OnChanges,
+  OnDestroy,
+  OnInit,
+  Renderer2,
+  SimpleChanges,
+  TemplateRef,
+  TrackByFunction,
+  ViewContainerRef,
+  ViewRef
+} from '@angular/core';
 import { Subscription } from 'rxjs';
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
 import { VirtualListItem } from '../virtual-list-item';
@@ -8,8 +27,10 @@ import { Recycler } from './recycler';
   selector: '[virtualForConstantHeight][virtualForConstantHeightOf]'
 })
 export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, DoCheck, OnDestroy {
+  // The datasource for list
   @Input('virtualForConstantHeightOf') data!: NgIterable<T>;
 
+  // trackBy function
   @Input('virtualForConstantHeightTrackBy')
   set trackBy(fn: TrackByFunction<T>) {
     if (isDevMode() && fn != null && typeof fn !== 'function' && <any>console && <any>console.warn)
@@ -18,25 +39,37 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     this._trackByFn = fn;
   }
 
+  // The template of each list item
   @Input('virtualForConstantHeightTemplate')
   set template(value: TemplateRef<VirtualListItem>) {
     if (value)
       this._template = value;
   }
 
+  // The height of each list item (use when the height of each element doesn't depend on the screen size)
   @Input('virtualForConstantHeightRowHeight') rowHeight: number = 0;
 
+  // returns the height of each list item (use for responsive layouts when the height of each element depends on screen size)
   @Input('virtualForConstantHeightRowHeightFn') getRowHeight!: () => number;
 
+  // recyler maximum limit
   @Input('virtualForConstantHeightLimit') limit: number = 8;
 
-  @Input('virtualForConstantHeightAbsolutePositioning') absolutePositioning: boolean = true;
+  // Set to true if we have a grid list
+  @Input('virtualForConstantHeightAbsolutePositioning')
+  set grid(isGrid: boolean) {
+    this._absolutePositioning = !isGrid;
+  }
 
+  // The number of columns for grid list (use when the columns count doesn't depend on the screen size)
   @Input('virtualForConstantHeightColumns') columns: number = 1;
 
+  // returns the number of columns for grid list (use for responsive layouts when the columns count depends on the screen size)
   @Input('virtualForConstantHeightColumnsFn') getColumnsFn!: () => number;
 
+  // An internal copy of datasource
   private _collection!: any[];
+  // Used for detecting changes in datasource in an officient way
   private _differ!: IterableDiffer<T>;
   private _trackByFn!: TrackByFunction<T>;
   private _subscription: Subscription = new Subscription();
@@ -45,28 +78,42 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
   private _containerHeight!: number;
   private _rowHeight = 0;
   private _columns = 1;
+  // Used for positioning grid items (used only for grid lists (columns > 1))
   private _offsetFromTop = 0;
 
-  private _firstItemPosition!: number;
-  private _lastItemPosition!: number;
+  private _firstVisibleItemIndex!: number;
+  private _lastItemVisibleIndex!: number;
   private _previousStartIndex: number = 0;
   private _previousEndIndex: number = 0;
 
+  // true if the directive is changing layout
   private _isInLayout: boolean = false;
+  // true if the directive is doing a measure
   private _isInMeasure: boolean = false;
+  // The next measurement to be performed
   private _pendingMeasurement!: number;
+  // True while waiting for fetching new items from datasource
   private _loading: boolean = false;
+  // If set to false, then we have a grid list
+  private _absolutePositioning: boolean = true;
 
+  // Recycler
   private _recycler = new Recycler();
 
   constructor(
+    // Wrapper
     private _virtualList: VirtualListComponent,
+    // An "IterableDiffer" factory for getting the _differ
     private _differs: IterableDiffers,
+    // The template of each list item
     private _template: TemplateRef<VirtualListItem>,
+    // An abstraction for runway containing all visible elements in dom
     private _viewContainerRef: ViewContainerRef,
+    // use for setting styles on html elements
     private _renderer: Renderer2,
   ) { }
 
+  // Checking for changes in data
   ngOnChanges(changes: SimpleChanges): void {
     if (!('data' in changes)) return;
 
@@ -80,6 +127,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     }
   }
 
+  // check for changes in data based on "IterableDiffer"
   ngDoCheck(): void {
     if (!this._differ) return;
 
@@ -89,6 +137,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     this.applyChanges(changes);
   }
 
+  // Listening to scroll and size change emitted from "VirtualListComponent" 
   ngOnInit(): void {
     this._subscription.add(
       this._virtualList.scrollPosition$
@@ -113,6 +162,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     this._recycler.clean();
   }
 
+  // React to changes to datasource
   private applyChanges(changes: IterableChanges<T>) {
     if (!this._collection)
       this._collection = [];
@@ -166,6 +216,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     this.requestLayout();
   }
 
+  // Changing the DOM
   private layout() {
     if (this._isInLayout) return;
 
@@ -187,11 +238,11 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
     this._recycler.pruneScrapViews();
     this._isInLayout = false;
-    this._previousStartIndex = this._firstItemPosition;
-    this._previousEndIndex = this._lastItemPosition;
-    let remainder = this._scrollY - (this._firstItemPosition / this._columns) * this._rowHeight;
+    this._previousStartIndex = this._firstVisibleItemIndex;
+    this._previousEndIndex = this._lastItemVisibleIndex;
+    let remainder = this._scrollY - (this._firstVisibleItemIndex / this._columns) * this._rowHeight;
 
-    if (!this.absolutePositioning) return;
+    if (!this._absolutePositioning) return;
 
     for (let i = 0; i < this._viewContainerRef.length; i++) {
       let view = this._viewContainerRef.get(i) as EmbeddedViewRef<any>;
@@ -200,10 +251,11 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     }
   }
 
+  // Adding the new items to DOM and removing invisible ones from DOM based on scroll direction or type
   insertViews() {
-    let isScrollUp = this._previousStartIndex > this._firstItemPosition || this._previousEndIndex > this._lastItemPosition;
-    let isScrollDown = this._previousStartIndex < this._firstItemPosition || this._previousEndIndex < this._lastItemPosition;
-    let isFastScroll = this._previousStartIndex > this._lastItemPosition || this._previousEndIndex < this._firstItemPosition;
+    let isScrollUp = this._previousStartIndex > this._firstVisibleItemIndex || this._previousEndIndex > this._lastItemVisibleIndex;
+    let isScrollDown = this._previousStartIndex < this._firstVisibleItemIndex || this._previousEndIndex < this._lastItemVisibleIndex;
+    let isFastScroll = this._previousStartIndex > this._lastItemVisibleIndex || this._previousEndIndex < this._firstVisibleItemIndex;
 
     if (isFastScroll) {
       for (let i = 0; i < this._viewContainerRef.length; i++) {
@@ -212,31 +264,31 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
         this._recycler.recycleView(child.context.index, child);
         i--;
       }
-      for (let i = this._firstItemPosition; i < this._lastItemPosition; i++) {
+      for (let i = this._firstVisibleItemIndex; i < this._lastItemVisibleIndex; i++) {
         let view = this.getView(i);
         if (!view) continue;
         this.dispatchLayout(view);
       }
-      this._offsetFromTop = (this._firstItemPosition / this._columns) * this._rowHeight;
+      this._offsetFromTop = (this._firstVisibleItemIndex / this._columns) * this._rowHeight;
     } else if (isScrollUp) {
-      for (let i = this._previousStartIndex - 1; i >= this._firstItemPosition; i--) {
+      for (let i = this._previousStartIndex - 1; i >= this._firstVisibleItemIndex; i--) {
         let view = this.getView(i);
         this.dispatchLayout(view, true);
         this._offsetFromTop -= this._rowHeight / this._columns;
       }
-      for (let i = this._lastItemPosition; i < this._previousEndIndex; i++) {
+      for (let i = this._lastItemVisibleIndex; i < this._previousEndIndex; i++) {
         let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(this._viewContainerRef.length - 1);
         this._viewContainerRef.detach(this._viewContainerRef.length - 1);
         this._recycler.recycleView(child.context.index, child);
       }
     } else if (isScrollDown) {
-      for (let i = this._previousStartIndex; i < this._firstItemPosition; i++) {
+      for (let i = this._previousStartIndex; i < this._firstVisibleItemIndex; i++) {
         let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(0);
         this._viewContainerRef.detach(0);
         this._offsetFromTop += this._rowHeight / this._columns;
         this._recycler.recycleView(child.context.index, child);
       }
-      for (let i = this._previousEndIndex; i < this._lastItemPosition; i++) {
+      for (let i = this._previousEndIndex; i < this._lastItemVisibleIndex; i++) {
         let view = this.getView(i);
         if (!view) continue;
         this.dispatchLayout(view);
@@ -246,16 +298,18 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     this.positionViews();
   }
 
+  // Calculate the range of visible items in screen
   private findPositionInRange() {
-    this._firstItemPosition = Math.max(0, Math.floor(this._scrollY / this._rowHeight) * this._columns);
-    this._lastItemPosition = Math.min(this._collection.length, Math.ceil((this._scrollY + Math.floor(this._containerHeight)) / this._rowHeight) * this._columns);
+    this._firstVisibleItemIndex = Math.max(0, Math.floor(this._scrollY / this._rowHeight) * this._columns);
+    this._lastItemVisibleIndex = Math.min(this._collection.length, Math.ceil((this._scrollY + Math.floor(this._containerHeight)) / this._rowHeight) * this._columns);
 
-    if (this._loading || this._lastItemPosition != this._collection.length) return;
+    if (this._loading || this._lastItemVisibleIndex != this._collection.length) return;
 
     this._virtualList.onScrollEnd();
     this._loading = true;
   }
 
+  // Positions a grid list items (No effect on non-grid lists (columns = 1))
   private positionViews() {
     for (let i = 0; i < this._viewContainerRef.length; i++) {
       let view = this._viewContainerRef.get(i) as EmbeddedViewRef<any>;
@@ -264,6 +318,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     }
   }
 
+  // Creates a new view if recycler is empty otherwise gets view from recycler and changes the bindings
   private getView(position: number): ViewRef {
     let view = this._recycler.getView(position) as EmbeddedViewRef<VirtualListItem>;
     let item = this._collection[position];
@@ -280,6 +335,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     return view;
   }
 
+  // inserting a view into DOM
   private dispatchLayout(view: ViewRef, addBefore: boolean = false) {
     if (addBefore)
       this._viewContainerRef.insert(view, 0);

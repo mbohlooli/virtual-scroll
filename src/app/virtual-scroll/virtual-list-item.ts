@@ -1,3 +1,4 @@
+// A class representing every element in virtual lists (virtualForConstantHeight and virtualFor)
 export class VirtualListItem {
     constructor(public $implicit: any, public index: number, public count: number) {
     }
