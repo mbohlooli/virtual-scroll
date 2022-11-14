@@ -1,15 +1,17 @@
 <virtual-list (scrollEnd)="scrollEnd()">
-  <div *virtualForConstantHeight="
+  <div *virtualFor="
     let item of data;
     let i = index;
-    rowHeight: 134
+    tombstone: tombstone;
+    tombstoneHeight: 100,
+    animationDuration: 200
   ">
-    <article class="article fixed-height-article">
+    <article class="article">
       {{i}}
-      <div *ngIf="item.image" class="image-container">
+      <div *ngIf="item?.image" class="image-container">
         <img [src]="item.image">
       </div>
-      {{item.text}}
+      {{item?.text}}
     </article>
   </div>
 </virtual-list>
