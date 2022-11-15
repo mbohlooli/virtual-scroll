@@ -3,14 +3,14 @@
     let item of data;
     let i = index;
     tombstone: tombstone;
-    tombstoneHeight: 100,
+    tombstoneHeight: 134,
     animationDuration: 200
   ">
     <article class="article">
       {{i}}
-      <div *ngIf="item?.image" class="image-container">
+      <!-- <div *ngIf="item?.image" class="image-container">
         <img [src]="item.image">
-      </div>
+      </div> -->
       {{item?.text}}
     </article>
   </div>

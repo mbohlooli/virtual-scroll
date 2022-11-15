@@ -209,10 +209,8 @@ export class VirtualForDirective<T> implements OnChanges, OnInit, DoCheck, OnDes
 
   insertViews() {
     // ! Where are those extra items coming from
-    console.log(this._firstItemIndex, this._lastItemIndex)
     for (let i = 0; i < this._viewContainerRef.length; i++) {
       let view = this._viewContainerRef.get(i) as EmbeddedViewRef<VirtualListItem>;
-      view.detach();
       this._recycler.recycleView(view.context.index, view);
     }
 
@@ -222,16 +220,21 @@ export class VirtualForDirective<T> implements OnChanges, OnInit, DoCheck, OnDes
       this._viewContainerRef.insert(view);
     }
 
-    for (let i = 0; i < this._viewContainerRef.length; i++) {
-      let view = this.getVisibleItem(i);
-      if (view && !this._heights[view.context.index]) {
-        this._heights[view.context.index] = view.rootNodes[0].offsetHeight;
-        // ! These 2 are alwaysss 34 :|
-        console.log(view.context.index, view.rootNodes[0])
+    requestAnimationFrame(() => {
+      for (let i = 0; i < this._viewContainerRef.length; i++) {
+        let view = this.getVisibleItem(i);
+        if (view && !this._heights[view.context.index]) {
+          this._heights[view.context.index] = view.rootNodes[0].offsetHeight;
+          console.log(view.context.index, this._heights[view.context.index]);
+        }
       }
-    }
+      this.positionViews();
+      console.log('--------------------------------------');
+      console.log('heights', this._heights);
+      console.log('positions', this._positions);
+      console.log('--------------------------------------');
+    });
 
-    this.positionViews();
 
     // window.scrollTo({ top: this._scrollY, behavior: 'auto' });
     // console.log(this._firstItemIndex, this._lastItemIndex)

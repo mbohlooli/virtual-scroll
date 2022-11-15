@@ -71,7 +71,7 @@ export class AppComponent implements OnInit {
 
   generateRandomText() {
     const CHARACTERS = 'ABCDEFGIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let length = Math.round(Math.random() * 200 + 50);
+    let length = Math.round(Math.random() * 300 + 50);
 
     let result = '';
     for (let i = 0; i < length; i++)
