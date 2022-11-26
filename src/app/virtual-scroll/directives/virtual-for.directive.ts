@@ -11,7 +11,8 @@ import {
   OnChanges, OnDestroy, OnInit, Renderer2, SimpleChanges,
   TemplateRef,
   TrackByFunction,
-  ViewContainerRef
+  ViewContainerRef,
+  ViewRef
 } from '@angular/core';
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
 import { VirtualListItem } from '../virtual-list-item';
@@ -60,6 +61,8 @@ export class VirtualForDirective<T> implements OnChanges, OnInit, DoCheck, OnDes
   private _containerHeight = 0;
   private _firstItemIndex = 0;
   private _lastItemIndex = 0;
+  private _previosFirstIndex = 0;
+  private _previosLastIndex = 0;
   private _scrollRunwayEnd = 0;
   private _heights!: number[];
   private _positions: number[] = [];
@@ -208,32 +211,41 @@ export class VirtualForDirective<T> implements OnChanges, OnInit, DoCheck, OnDes
   }
 
   insertViews() {
-    // ! Where are those extra items coming from
+    // ! Images are messing the height calculation up 
+    // ! The nodes doesnt insert in order!!!!!
+    // * This approch repeats but it is in order
+    // let isScrollUp = this._previosFirstIndex > this._firstItemIndex || this._previosLastIndex > this._lastItemIndex;
+    // let isScrollDown = this._previosFirstIndex < this._firstItemIndex || this._previosLastIndex < this._lastItemIndex;
+    // let isFastScroll = this._previosFirstIndex > this._lastItemIndex || this._previosLastIndex < this._firstItemIndex;
+    //! not so good at the start
+    //! initial fast scroll doesn't work so good
+    // * This is fine, the only problem is for scrolling top (the curpos is too high?)
     for (let i = 0; i < this._viewContainerRef.length; i++) {
-      let view = this._viewContainerRef.get(i) as EmbeddedViewRef<VirtualListItem>;
-      this._recycler.recycleView(view.context.index, view);
+      let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(i);
+      this._viewContainerRef.detach(i);
+      this._recycler.recycleView(child.context.index, child);
+      i--;
     }
-
     for (let i = this._firstItemIndex; i < this._lastItemIndex; i++) {
       let view = this.getView(i);
-      view.rootNodes[0].style.position = 'absolute';
-      this._viewContainerRef.insert(view);
+      if (!view) continue;
+      this.dispatchLayout(view);
     }
+
 
     requestAnimationFrame(() => {
       for (let i = 0; i < this._viewContainerRef.length; i++) {
         let view = this.getVisibleItem(i);
+        view.rootNodes[0].style.position = 'absolute';
+        // TODO: think about this if
         if (view && !this._heights[view.context.index]) {
           this._heights[view.context.index] = view.rootNodes[0].offsetHeight;
-          console.log(view.context.index, this._heights[view.context.index]);
+          // console.log(view.context.index, this._heights[view.context.index]);
         }
       }
-      this.positionViews();
-      console.log('--------------------------------------');
-      console.log('heights', this._heights);
-      console.log('positions', this._positions);
-      console.log('--------------------------------------');
-    });
+
+    })
+    this.positionViews();
 
 
     // window.scrollTo({ top: this._scrollY, behavior: 'auto' });
@@ -348,5 +360,14 @@ export class VirtualForDirective<T> implements OnChanges, OnInit, DoCheck, OnDes
     }
 
     return view;
+  }
+
+  dispatchLayout(view: ViewRef, addBefore: boolean = false) {
+    if (addBefore)
+      this._viewContainerRef.insert(view, 0);
+    else
+      this._viewContainerRef.insert(view);
+
+    view.reattach();
   }
 }

@@ -9,7 +9,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { BehaviorSubject, fromEvent, Subscription } from 'rxjs';
-import { map, filter, tap, debounceTime } from "rxjs/operators";
+import { debounceTime, map, tap } from "rxjs/operators";
 import { ScrollState } from '../../scroll-state';
 
 /**
@@ -52,13 +52,16 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
     return this._scrollStateChangeSubject.asObservable();
   }
 
+  // Subjects that observe events that are important
   private _subscription = new Subscription();
   private _scrollPositionSubject = new BehaviorSubject<number>(-1);
   private _sizeChangeSubject = new BehaviorSubject<number[]>([0, 0]);
   private _scrollStateChangeSubject = new BehaviorSubject<ScrollState>(ScrollState.Idle);
 
+  // The dimensions of viewport
   private _containerWidth!: number;
   private _containerHeight!: number;
+  // Used for when the scroll doesn't stat from zero (ex. when we have a top menu bar and we use window as the scroll source)
   private _scrollOffset: number = 0;
   private _currentScrollState: ScrollState = ScrollState.Idle;
 
@@ -66,6 +69,7 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     this._subscription.add(
       fromEvent(this.viewport ? this.viewport.nativeElement : window, 'scroll').pipe(
+        // Calculating the offset from top and mapping scroll to the correct scroll amount
         map(() => {
           if (this._scrollOffset == 0 && !this.viewport) {
             let rect = this.listHolder.nativeElement.getBoundingClientRect();
@@ -90,6 +94,7 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
           this._currentScrollState = ScrollState.Scrolling;
           this._scrollStateChangeSubject.next(this._currentScrollState);
         }),
+        // Notifies the observer 200ms after the client stopped scrolling 
         debounceTime(200),
       ).subscribe(() => {
         if (this._currentScrollState !== ScrollState.Scrolling) return;

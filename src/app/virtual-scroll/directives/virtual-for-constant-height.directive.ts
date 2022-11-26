@@ -293,6 +293,19 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
         if (!view) continue;
         this.dispatchLayout(view);
       }
+    } else {
+      for (let i = 0; i < this._viewContainerRef.length; i++) {
+        let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(i);
+        this._viewContainerRef.detach(i);
+        this._recycler.recycleView(child.context.index, child);
+        i--;
+      }
+      for (let i = this._firstVisibleItemIndex; i < this._lastItemVisibleIndex; i++) {
+        let view = this.getView(i);
+        if (!view) continue;
+        this.dispatchLayout(view);
+      }
+      this._offsetFromTop = (this._firstVisibleItemIndex / this._columns) * this._rowHeight;
     }
 
     this.positionViews();

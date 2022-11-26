@@ -59,14 +59,14 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     setTimeout(() => {
-      for (let i = 0; i < 100; i++)
+      for (let i = 0; i < 10; i++)
         this.data.push({
           index: i,
           text: this.generateRandomText(),
           image: Math.random() > 0.8 ? this.randomImage : ''
         });
       this.loading = false;
-    }, 2000);
+    }, 500);
   }
 
   generateRandomText() {
@@ -84,7 +84,7 @@ export class AppComponent implements OnInit {
     if (this.data.length >= 200) return;
     this.loading = true;
     setTimeout(() => {
-      for (let i = 0; i < 10; i++)
+      for (let i = 0; i < 5; i++)
         this.data.push({
           index: i,
           text: this.generateRandomText(),
@@ -102,5 +102,13 @@ export class AppComponent implements OnInit {
       return 400;
 
     return 100;
+  }
+
+  removeItem(index: number) {
+    this.data.splice(index, 1);
+  }
+
+  changeText(index: number) {
+    this.data[index].text = 'this is the awesome new text.';
   }
 }
