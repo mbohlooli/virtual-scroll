@@ -26,7 +26,7 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
   // The viewport for list (default: window) 
   @Input('viewport') private viewport!: ElementRef;
   // Raised when user scrolls to the end of list
-  @Output('scrollEnd') private scrollEnd = new EventEmitter();
+  @Output('scrollEnd') private _onScrollEnd = new EventEmitter();
   // The runway containing list items
   @ViewChild('listHolder', { static: true }) private _listHolder!: ElementRef;
   // A tiny div that moves along Y axis, simulating the total scroll height
@@ -50,6 +50,10 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
 
   get scrollStateChange$() {
     return this._scrollStateChangeSubject.asObservable();
+  }
+
+  get scrollTop() {
+    return this.viewport ? this.viewport.nativeElement.scrollTop : window.scrollY - this._scrollOffset;
   }
 
   // Subjects that observe events that are important
@@ -111,7 +115,7 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
   }
 
   onScrollEnd() {
-    this.scrollEnd.emit();
+    this._onScrollEnd.emit();
   }
 
   // get the viewport dimensions

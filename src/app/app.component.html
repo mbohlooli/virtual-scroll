@@ -1,33 +1,20 @@
-<!-- <virtual-list (scrollEnd)="scrollEnd()">
-  <div *virtualFor="
-    let item of data;
-    let i = index;
-    tombstone: tombstone;
-    tombstoneHeight: 134,
-    animationDuration: 200
+<virtual-list (scrollEnd)="scrollEnd()">
+  <div class="list-item" *virtualFor="
+  let item of data;
+  let i = index;
+  tombstone: tombstone;
+  hasMore: data.length < 200
   ">
     <article class="article">
-      {{i}}
-      <div *ngIf="item?.image" class="image-container">
+      {{data.indexOf(item)}}
+      <!-- <div *ngIf="item?.image" class="image-container">
         <img [src]="item.image">
-      </div>
+      </div> -->
       {{item?.text}}
     </article>
   </div>
-</virtual-list> -->
-
-<virtual-list (scrollEnd)="scrollEnd()">
-  <article class="article fixed-height-article" (click)="removeItem(i)"
-    *virtualForConstantHeight="let item of data; let i = index; RowHeight: 120">
-    {{item.index}}
-    {{item?.text}}
-  </article>
 </virtual-list>
 
-<div class="loader" *ngIf="loading">
-  <mat-spinner></mat-spinner>
-</div>
-
 <ng-template #tombstone>
-  <article class="article fixed-height-article"></article>
+  <article class="article fixed-height-article tombstone"></article>
 </ng-template>

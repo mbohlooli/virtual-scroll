@@ -91,11 +91,14 @@ export class AppComponent implements OnInit {
           image: Math.random() > 0.8 ? this.randomImage : ''
         });
       this.loading = false;
-    }, 1000);
+      }, 500);
     // console.log(this.data);
 
   }
 
+  hasMore = () => {
+    return this.data.length < 200;
+  }
 
   getHeight = (item: { index: number, text: string, image: string }) => {
     if (item.image)
