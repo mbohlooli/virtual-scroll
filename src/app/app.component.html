@@ -1,8 +1,9 @@
-<virtual-list (scrollEnd)="scrollEnd()">
+<virtual-list (scrollEnd)="scrollEnd()" *ngIf="data.length != 0; else loading">
   <div class="list-item" *virtualFor="
   let item of data;
   let i = index;
   tombstone: tombstone;
+  hasMoreFn: hasMore
   ">
     <article class="article" (click)="expand(data.indexOf(item))">
       {{data.indexOf(item)}}
@@ -13,6 +14,15 @@
     </article>
   </div>
 </virtual-list>
+
+<ng-template #loading>
+  <div class="loader">
+
+    <mat-spinner></mat-spinner>
+  </div>
+</ng-template>
+
+
 <ng-template #tombstone>
   <div class="tombstone-container list-item tombstone">
     <article class="article fixed-height-article"></article>

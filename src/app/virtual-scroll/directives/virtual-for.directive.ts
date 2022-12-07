@@ -31,7 +31,8 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   @Input('virtualForTrackBy') trackBy!: TrackByFunction<T>;
   // TODO: move the tombstone to virtual list component
   @Input('virtualForTombstone') tombstone!: TemplateRef<any>;
-  @Input('marginalItemsToRender') marginalItemsToRender: number = 2;
+  @Input('virtualForMarginalItemsToRender') marginalItemsToRender: number = 2;
+  @Input('virtualForHasMoreFn') hasMoreFn!: () => boolean;
 
   private _differ!: IterableDiffer<T>;
   private _items: ListItem[] = [];
@@ -138,6 +139,12 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   onScroll() {
     let delta = this._virtualList.scrollTop - this._scrollTop;
 
+    if (!this.hasMoreFn() && delta > 0 && this.calculateAnchoredItem(this._anchor, this._virtualList.measure().height).index == this._loadedItems-1) {
+      this._lastAttachedItem = this._loadedItems;
+      this.fill(this._anchor.index - this.marginalItemsToRender, this._lastAttachedItem);
+      return;
+    }
+
     this._anchor = this._virtualList.scrollTop == 0 ? {index: 0, offset: 0} : this.calculateAnchoredItem(this._anchor, delta);
     this._scrollTop = this._virtualList.scrollTop;
     let {index: lastIndex} = this.calculateAnchoredItem(this._anchor, this._virtualList.measure().height);
@@ -221,6 +228,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   }
 
   insertVisibleItems() {
+    let tombstonesCount = 0;
     for (let i = this._firstAttachedItem; i < this._lastAttachedItem; i++) {
       while (this._items.length <= i)
         this.addItem();
@@ -233,7 +241,15 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
         this._items[i].node = null;
       }
 
+      // TODO: fix the error that this line causes
+      if (tombstonesCount > 3) {
+        //! this line below solves the problem but introduces another one wich is the stops that occur sometimes on scroll end
+        this._lastAttachedItem = i;
+        break;
+      }
       let node = this._items[i].data ? this.render(this._items[i].data, this._unusedNodes.getView()) : this.getTombstone();
+      if (node.rootNodes[0].classList.contains('tombstone'))
+        tombstonesCount++;
       node.rootNodes[0].style.position = 'absolute';
       this._items[i].top = -1;
       this._viewContainerRef.insert(node);

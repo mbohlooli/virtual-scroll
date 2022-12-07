@@ -81,7 +81,7 @@ export class AppComponent implements OnInit {
   }
 
   scrollEnd() {
-    // if (this.data.length >= 200) return;
+    if (this.data.length >= 200) return;
     this.loading = true;
     setTimeout(() => {
       for (let i = 0; i < 5; i++)
@@ -92,8 +92,6 @@ export class AppComponent implements OnInit {
         });
       this.loading = false;
       }, 500);
-    // console.log(this.data);
-
   }
 
   hasMore = () => {
