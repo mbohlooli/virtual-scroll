@@ -144,6 +144,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     this.fill(this._anchor.index - this.marginalItemsToRender, lastIndex + this.marginalItemsToRender);
   }
 
+  // TODO: which is the anchor item? the first in dom or first in screen????
   calculateAnchoredItem(initialAnchor: ScrollAnchor, delta: number) {
     if (delta == 0)
       return initialAnchor;
@@ -191,7 +192,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
         this._viewContainerRef.detach(index);
     }
 
-    requestAnimationFrame(() => this.getItemsSize())
+    requestAnimationFrame(() => this.getItemsSize());
 
     if (this._measureRequired)
       this.updateScroll();
@@ -240,7 +241,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     }
   }
 
-  getItemsSize() {
+  async getItemsSize() {
     for (let i = this._firstAttachedItem; i < this._lastAttachedItem; i++) {
       if (!this._items[i].data || this._items[i].height) continue;
 

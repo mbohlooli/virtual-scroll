@@ -4,7 +4,7 @@
   let i = index;
   tombstone: tombstone;
   ">
-    <article class="article">
+    <article class="article" (click)="expand(data.indexOf(item))">
       {{data.indexOf(item)}}
       <!-- <div *ngIf="item?.image" class="image-container">
         <img [src]="item.image">

@@ -41,6 +41,7 @@ $shadow-color: rgba(0, 0, 0, 0.1);
   display: flex;
   contain: layout;
   will-change: transform;
+  max-width: 100%;
 }
 
 .loader {
