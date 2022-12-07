@@ -3,7 +3,6 @@
   let item of data;
   let i = index;
   tombstone: tombstone;
-  hasMore: data.length < 200
   ">
     <article class="article">
       {{data.indexOf(item)}}
@@ -14,7 +13,8 @@
     </article>
   </div>
 </virtual-list>
-
 <ng-template #tombstone>
-  <article class="article fixed-height-article tombstone"></article>
+  <!-- <div class="list-item"> -->
+    <article class="article fixed-height-article tombstone"></article>
+  <!-- </div> -->
 </ng-template>

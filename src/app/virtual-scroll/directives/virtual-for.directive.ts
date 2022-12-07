@@ -1,16 +1,21 @@
 import {
-  Directive, DoCheck, EmbeddedViewRef, Input, isDevMode, IterableChanges, IterableDiffer, IterableDiffers, NgIterable, OnChanges, OnDestroy, OnInit, Renderer2, SimpleChanges, TemplateRef, TrackByFunction, ViewContainerRef
+  Directive,  Input,
+  OnChanges, OnDestroy, OnInit, DoCheck,
+  IterableChanges, IterableDiffer, SimpleChanges, IterableDiffers, NgIterable, TrackByFunction, 
+  EmbeddedViewRef, TemplateRef, ViewContainerRef,
+  Renderer2
 } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { Subscription } from "rxjs";
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
+import { Recycler } from '../recycler';
 import { VirtualListItem } from '../virtual-list-item';
 
 interface ListItem {
-  data: any,
-  node: any,
+  data?: any,
+  node?: any,
   height: number,
-  width: number,
-  top: number
+  width?: number,
+  top?: number
 }
 
 interface ScrollAnchor {
@@ -21,67 +26,71 @@ interface ScrollAnchor {
 @Directive({
   selector: '[virtualFor][virtualForOf]'
 })
-export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDestroy {
+export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDestroy {
   @Input('virtualForOf') data!: NgIterable<T>;
+  @Input('virtualForTrackBy') trackBy!: TrackByFunction<T>;
+  // TODO: move the tombstone to virtual list component
+  @Input('virtualForTombstone') tombstone!: TemplateRef<any>;
+  @Input('marginalItemsToRender') marginalItemsToRender: number = 2;
 
-  @Input('virtualForTombstone') tombstone!: TemplateRef<VirtualListItem>;
-
-  //? trackBy function
-  @Input('virtualForTrackBy')
-  set trackBy(fn: TrackByFunction<T>) {
-    if (isDevMode() && fn != null && typeof fn !== 'function' && <any>console && <any>console.warn)
-      console.warn(`trackBy must be a function, but received ${JSON.stringify(fn)}.`);
-
-    this._trackByFn = fn;
-  }
-
-  @Input('virtualForMarginalItemsToRender') marginalItemsToRender: number = 1;
-
-  @Input('virtualForAdditionalScroll') additionalScroll: number = 0;
-
-  @Input('virtualForAnimatioinDurationMs') animationDurationMs = 200;
-
-  @Input('virtualForHasMore') hasMore!: boolean;
-
-
-  //? An internal copy of datasource
-  private _items: ListItem[] = [];
-  //? Used for detecting changes in datasource in an officient way
   private _differ!: IterableDiffer<T>;
-  private _trackByFn!: TrackByFunction<T>;
-  private _subscription: Subscription = new Subscription();
+  private _items: ListItem[] = [];
+  private _requestInProgress = false;
 
-  private _anchorItem: ScrollAnchor = { index: 0, offset: 0 };
-  private _anchorScrollTop: number = 0;
-  private _scrollRunwayEnd: number = 0;
+  private _firstAttachedItem = 0;
+  private _lastAttachedItem = 0;
 
-  private _firstAttachedItem: number = 0;
-  private _lastAttachedItem: number = 0;
+  private _tombstones = new Recycler();
+  private _unusedNodes = new Recycler();
 
-  private _tombstoneHeight: number = 0;
-  private _tombstoneWidth: number = 0;
+  private _loadedItems = 0;
 
-  private _tombstonesRecycler: any[] = [];
-  private _recycler: any[] = [];
+  private _measureRequired = false;
 
-  private _loadedItems: number = 0;
-  private _requestInProgress: boolean = false;
+  private _scrollTop = 0;
+  private _anchor: ScrollAnchor = {index:0, offset: 0};
 
+  private _tombstoneHeight = 0;
+  private _tombstoneWidth = 0;
+  
+  private _scrollEnd = 0;
+  private _subscription = new Subscription();
 
   constructor(
-    //? Wrapper
-    private _virtualList: VirtualListComponent,
-    //? An "IterableDiffer" factory for getting the _differ
     private _differs: IterableDiffers,
-    //? The template of each list item
-    private _template: TemplateRef<VirtualListItem>,
-    //? An abstraction for runway containing all visible elements in dom
     private _viewContainerRef: ViewContainerRef,
-    //? use for setting styles on html elements
-    private _renderer: Renderer2,
-  ) { }
+    private _template: TemplateRef<VirtualListItem>,
+    private _virtualList: VirtualListComponent,
+    private _renderer: Renderer2
+  ) {}
 
-  //? Checking for changes in data
+  ngOnInit(): void {
+    this._subscription.add(
+      this._virtualList.sizeChange$.subscribe(() => {
+        let tombstone = this.getTombstone();
+        //? nesseary??
+        tombstone.rootNodes[0].style.position = 'absolute';
+        this._viewContainerRef.insert(tombstone);
+        this._tombstoneHeight = tombstone.rootNodes[0].offsetHeight;
+        this._tombstoneWidth = tombstone.rootNodes[0].offsetWidth;
+        this._viewContainerRef.remove(this._viewContainerRef.indexOf(tombstone));
+  
+        for (let i = 0; i < this._items.length; i++)
+          this._items[i].width = this._items[i].height = 0;
+        this.onScroll();
+      })
+    );
+    this._subscription.add(
+      this._virtualList.scrollPosition$.subscribe(() => this.onScroll())
+    );
+  }
+
+  ngOnDestroy(): void {
+    this._tombstones.clean();
+    this._unusedNodes.clean();
+    this._subscription.unsubscribe();
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     if (!('data' in changes)) return;
 
@@ -89,13 +98,12 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
     if (this._differ || !value) return;
 
     try {
-      this._differ = this._differs.find(value).create(this._trackByFn);
-    } catch (e) {
+      this._differ = this._differs.find(value).create(this.trackBy);
+    } catch (exception) {
       throw new Error(`Cannot find a differ supporting object '${value}' of this type. NgFor only supports binding to Iterables such as Arrays.`);
     }
   }
 
-  //? check for changes in data based on "IterableDiffer"
   ngDoCheck(): void {
     if (!this._differ) return;
 
@@ -103,266 +111,213 @@ export class VirtualForDirective<T> implements OnInit, OnChanges, DoCheck, OnDes
     if (!changes) return;
 
     this.applyChanges(changes);
-    // for (let i = 0; i < this._items.length; i++) {
-    //   let view = this._viewContainerRef.createEmbeddedView(this._template);
-    //   view.context.$implicit = this._items[i];
-    //   view.context.index = i;
-    // }
   }
 
-  //? Listening to scroll and size change emitted from "VirtualListComponent" 
-  ngOnInit(): void {
-    this._subscription.add(
-      this._virtualList.scrollPosition$.subscribe((scrollY) => this.onScroll())
-    );
-
-    this._subscription.add(
-      this._virtualList.sizeChange$.subscribe(([width, height]) => {
-        let tombstone = this.createTombstone();
-        tombstone.rootNodes[0].style.position = 'absolute';
-        this._viewContainerRef.insert(tombstone);
-        tombstone.rootNodes[0].style.display = 'unset';
-        this._tombstoneWidth = tombstone.rootNodes[0].offsetWidth;
-        this._tombstoneHeight = tombstone.rootNodes[0].offsetHeight + 14;
-        this._viewContainerRef.detach(this._viewContainerRef.length-1);
-
-        for (let i = 0; i < this._items.length; i++)
-          this._items[i].width = this._items[i].height = 0;
-
-        this.onScroll();
-      })
-    );
-  }
-
-  ngOnDestroy(): void {
-    this._subscription.unsubscribe();
-    this._tombstonesRecycler = [];
-    this._recycler = [];
-  }
-
-  //? React to changes to datasource
-  private applyChanges(changes: IterableChanges<T>) {
-    if (!this._items)
-      this._items = [];
-
-    let isMeasurementRequired = false;
-
+  applyChanges(changes: IterableChanges<T>) {
+    //TODO: the logic of addcontent goes here
     changes.forEachOperation(({item, previousIndex}, adjustedPreviousIndex, currentIndex) => {
       if (previousIndex == null) {
-        isMeasurementRequired = true;
-        this._items.splice(currentIndex || 0, 0, {data: item, height: 0, node: null, top: 0, width: 0});
+        this._items.splice(currentIndex || 0, 0, {data: item, height: 0});
+        this._loadedItems++;
       } else if (currentIndex == null) {
-        isMeasurementRequired = true;
         this._items.splice(adjustedPreviousIndex || 0, 1);
+        this._loadedItems--;
       } else {
         this._items.splice(currentIndex, 0, this._items.splice(adjustedPreviousIndex || 0, 1)[0]);
       }
     });
+    changes.forEachIdentityChange((record: any) => this._items[record.currentIndex].data = record.item);
 
-    changes.forEachIdentityChange((record: any) => this._items[record.currentIndex] = record.item);
-    
+    // ! Danger line (may cause problems)
     this._requestInProgress = false;
-    this._loadedItems = this._items.length;
-    
-    this.onScroll();
+
+    // TODO: call the attachContent
+    this.attachContent();
   }
 
   onScroll() {
-    let scrollTop = this._virtualList.scrollTop;
-    let delta = scrollTop - this._anchorScrollTop;
+    let delta = this._virtualList.scrollTop - this._scrollTop;
 
-    if (scrollTop == 0)
-      this._anchorItem = {index: 0, offset: 0};
-    else
-      this._anchorItem = this.calculateAnchorItem(this._anchorItem, delta);
-
-    this._anchorScrollTop = scrollTop;
-    let { index: lastIndex } = this.calculateAnchorItem(this._anchorItem, this._virtualList.measure().height);
-
-    this.fill(this._anchorItem.index - this.marginalItemsToRender, lastIndex + this.marginalItemsToRender);
+    this._anchor = this._virtualList.scrollTop == 0 ? {index: 0, offset: 0} : this.calculateAnchoredItem(this._anchor, delta);
+    this._scrollTop = this._virtualList.scrollTop;
+    let {index: lastIndex} = this.calculateAnchoredItem(this._anchor, this._virtualList.measure().height);
+    this.fill(this._anchor.index - this.marginalItemsToRender, lastIndex + this.marginalItemsToRender);
   }
 
-  calculateAnchorItem(currentAnchor: ScrollAnchor, delta: number): ScrollAnchor {
-    if (delta == 0) return currentAnchor;
-    
-    delta += currentAnchor.offset;
-    let i = currentAnchor.index;
+  calculateAnchoredItem(initialAnchor: ScrollAnchor, delta: number) {
+    if (delta == 0)
+      return initialAnchor;
+
+    delta += initialAnchor.offset;
+    let i = initialAnchor.index;
     let tombstones = 0;
 
     if (delta < 0) {
-      while (i > 0 && delta < 0 && this._items[i].height)
+      while (delta < 0 && i > 0 && this._items[i - 1].height)
         delta += this._items[--i].height;
-      tombstones = Math.max(-i, Math.ceil(Math.min(0, delta)/this._tombstoneHeight));
+
+      tombstones = Math.max(-i, Math.ceil(Math.min(delta, 0) / this._tombstoneHeight));
     } else {
-      while (i < this._items.length && delta > 0 && this._items[i].height)
+      while (delta > 0 && i < this._items.length && this._items[i].height && this._items[i].height < delta)
         delta -= this._items[i++].height;
+
       if (i >= this._items.length || !this._items[i].height)
-        tombstones = Math.floor(Math.max(0, delta)/this._tombstoneHeight);
+        tombstones = Math.floor(Math.max(delta, 0) / this._tombstoneHeight);
     }
 
     i += tombstones;
-    return {index: i, offset: delta};
+    delta -= tombstones * this._tombstoneHeight;
+
+    return {
+      index: i,
+      offset: delta,
+    };
   }
 
   fill(start: number, end: number) {
     this._firstAttachedItem = Math.max(0, start);
     this._lastAttachedItem = end;
     this.attachContent();
-  }
+  } 
 
   attachContent() {
-    if (this._items.length == 0) return;
+    //TODO: display tombstone until the item height becomes known
+    this.recycleUnusedNodes();
+    this.insertVisibleItems();
 
+    while(this._unusedNodes.size) {
+      let index = this._viewContainerRef.indexOf(this._unusedNodes.getView() as EmbeddedViewRef<any>);
+      if (index >= 0)
+        this._viewContainerRef.detach(index);
+    }
+
+    requestAnimationFrame(() => this.getItemsSize())
+
+    if (this._measureRequired)
+      this.updateScroll();
+
+    this.positionViews();
+
+    this.maybeRequestContent();
+  }
+
+  recycleUnusedNodes() {
     for (let i = 0; i < this._items.length; i++) {
       if (i == this._firstAttachedItem) {
         i = this._lastAttachedItem - 1;
         continue;
       }
-      if (this._items[i].node) {
-        if (this._items[i].node?.rootNodes[0].classList.contains('tombstone')) {
-          this._tombstonesRecycler.push(this._items[i].node);
-          this._items[i].node.rootNodes[0].style.display = 'none';
+      if (this._items[i].node)
+        //TODO: maybe do sth to not write node.rootNodes[0] every time 
+        if (this._items[i].node.rootNodes[0].classList.contains('tombstone')) {
+          this._viewContainerRef.detach(this._viewContainerRef.indexOf(this._items[i].node));
+          this._tombstones.recycleView(this._items[i].node);
         } else {
-          this._recycler.push(this._items[i].node);
-          this._viewContainerRef.detach(this._viewContainerRef.indexOf(this._items[i].node))
+          this._unusedNodes.recycleView(this._items[i].node);
         }
-        this._items[i].node = null;
-      }
+      this._items[i].node = null;
     }
+  }
 
-    let tombstoneAnimations: {[key: number]: [any, number]} = {};
+  insertVisibleItems() {
     for (let i = this._firstAttachedItem; i < this._lastAttachedItem; i++) {
       while (this._items.length <= i)
         this.addItem();
-      if (this._items[i]?.node) {
-        if (this._items[i]?.node?.rootNodes[0].classList.contains('tombstone') && this._items[i].data) {
-          if (this.animationDurationMs) {
-            this._items[i].node.rootNodes[0].style.zIndex = 1;
-            tombstoneAnimations[i] = [this._items[i].node, this._items[i].top - this._anchorScrollTop];
-          } else {
-            this._items[i].node.rootNodes[0].style.display = 'none';
-            this._tombstonesRecycler.push(this._items[i].node);
-          }
-        } else {
-          continue;
-        }
+
+      if (this._items[i].node) {
+        if (!this._items[i].node.rootNodes[0].classList.contains('tombstone') || this._items[i].height) continue;
+
+        this._viewContainerRef.detach(this._viewContainerRef.indexOf(this._items[i].node));
+        this._tombstones.recycleView(this._items[i].node);
+        this._items[i].node = null;
       }
 
-      if (!this.hasMore && !this._items[i].data) return;
-      let node = this._items[i].data ? this.render(this._items[i].data, this._recycler.pop()) : this.getTombstone();
+      let node = this._items[i].data ? this.render(this._items[i].data, this._unusedNodes.getView()) : this.getTombstone();
       node.rootNodes[0].style.position = 'absolute';
       this._items[i].top = -1;
       this._viewContainerRef.insert(node);
       this._items[i].node = node;
     }
+  }
 
-    this._recycler = [];
+  getItemsSize() {
+    for (let i = this._firstAttachedItem; i < this._lastAttachedItem; i++) {
+      if (!this._items[i].data || this._items[i].height) continue;
 
-    requestAnimationFrame(() => {
-      for (let i = this._firstAttachedItem; i < this._lastAttachedItem; i++)
-        if (this._items[i].data && !this._items[i].height) {
-          this._items[i].height = this._items[i].node?.rootNodes[0].offsetHeight;
-          this._items[i].width = this._items[i].node?.rootNodes[0].offsetWidth;
-        }
-    })
+      this._items[i].height = this._items[i].node.rootNodes[0].offsetHeight;
+      this._items[i].width = this._items[i].node.rootNodes[0].offsetWidth;
+      this._measureRequired = true;
+    }
+  }
 
-    this._anchorScrollTop = 0;
-    for (let i = 0; i < this._anchorItem.index; i++)
-      this._anchorScrollTop += this._items[i].height || this._tombstoneHeight;
-    this._anchorScrollTop += this._anchorItem.offset;
+  positionViews() {
+    // Position all nodes.
+    let currentPosition = this._scrollTop - this._anchor.offset;
+    let i = this._anchor.index;
 
-    let currentPosition = this._anchorScrollTop - this._anchorItem.offset;
-    let i = this._anchorItem.index;
+    //? curPos will be the first attached item position after these two loops (not necessarily visible)
+    //* ScrollDown
     while (i > this._firstAttachedItem)
-      currentPosition -= this._items[--i].height ||  this._tombstoneHeight;
+      currentPosition -= this._items[--i].height || this._tombstoneHeight;
+
+    //* ScrollUp
     while (i < this._firstAttachedItem)
       currentPosition += this._items[i++].height || this._tombstoneHeight;
-
-    for (let i in tombstoneAnimations) {
-      let anim = tombstoneAnimations[i];
-      // TODO: fix this
-      this._items[i].node.rootNodes[0].style.transform = `translateY(${this._anchorScrollTop + anim[1]}px) scale(${this._tombstoneWidth / this._items[i].width}, ${this._tombstoneHeight / this._items[i].height})`;
-      this._items[i].node.rootNodes[0].offsetTop;
-      anim[0].offsetTop;
-      // TODO: fix this
-      this._items[i].node.rootNodes[0].style.transition = `transform ${this.animationDurationMs}ms`;
-    }
-
+    
     for (let i = this._firstAttachedItem; i < this._lastAttachedItem; i++) {
-      let anim = tombstoneAnimations[i];
-      if (anim) {
-        anim[0].rootNodes[0].style.transition = `transform ${this.animationDurationMs}ms, opacity ${this.animationDurationMs}ms`;
-        anim[0].rootNodes[0].style.transform = `translateY(${currentPosition}px) scale(${this._tombstoneWidth / this._items[i].width}, ${this._tombstoneHeight / this._items[i].height})`;
-        anim[0].rootNodes[0].style.opacity = 0;
-      }
-      if (currentPosition != this._items[i].top) {
-        // TODO: fix this
-        if (!anim)
-          this._items[i].node.rootNodes[0].style.transition = '';
+      if (currentPosition != this._items[i].top)
         this._items[i].node.rootNodes[0].style.transform = `translateY(${currentPosition}px)`;
-      }
+
       this._items[i].top = currentPosition;
       currentPosition += this._items[i].height || this._tombstoneHeight;
     }
 
-    // TODO: make this 
-    this._scrollRunwayEnd = Math.max(this._scrollRunwayEnd, currentPosition + this.additionalScroll);
-    this._renderer.setStyle(this._virtualList.sentinel?.nativeElement, 'transform', `translateY(${this._scrollRunwayEnd}px)`);
-    // TODO: set the scroll top (declare set or method in virtual-list component)
+    this._scrollEnd = Math.max(this._scrollEnd, currentPosition);
+  }
 
-    if (this.animationDurationMs)
-      setTimeout(() => {
-        for (let i in tombstoneAnimations) {
-          let anim = tombstoneAnimations[i];
-          anim[0].rootNodes[0].style.display = 'none';
-          this._tombstonesRecycler.push(anim[0]);
-        }
-      }, this.animationDurationMs);
+  updateScroll() {
+    this._scrollTop = 0;
+    for (let i = 0; i < this._anchor.index; i++)
+      this._scrollTop += this._items[i].height || this._tombstoneHeight;
+    this._scrollTop += this._anchor.offset;
 
-    // TODO: caluclate items needed and if it was big enough then call this
-    this.maybeRequestContent();
+    // TODO: make a function for setting the sentinel position in virtual list component
+    this._renderer.setStyle(this._virtualList.sentinel.nativeElement, 'transform', `translateY(${this._scrollEnd+100}px)`);
+    // TODO: we don't hava a way to set this!
+    // this.scroller_.scrollTop = this._scrollTop;
+    this._measureRequired = false;
+  }
+
+  render(item: any, node: any) {
+    if (!node)
+      return this._template.createEmbeddedView(new VirtualListItem(item, item.index, this._loadedItems));
+
+    node.context.$implicit = item;
+    node.context.index = item.index;
+    node.context.count = this._loadedItems;
+    return node;
   }
 
   maybeRequestContent() {
     if (this._requestInProgress) return;
-    // let itemsNeeded = this._lastAttachedItem - this._loadedItems;
-    // if (itemsNeeded <= 0) return;
+
+    let itemsNeeded = this._lastAttachedItem - this._loadedItems;
+    if (itemsNeeded <= 0) return;
+
     this._requestInProgress = true;
     this._virtualList.onScrollEnd();
   }
 
-  getTombstone() {
-    var tombstone = this._tombstonesRecycler.pop();
-    if (tombstone) {
-      tombstone.rootNodes[0].style.opacity = 1;
-      tombstone.rootNodes[0].style.display = 'unset';
-      tombstone.rootNodes[0].style.transform = '';
-      tombstone.rootNodes[0].style.transition = '';
-      return tombstone;
-    }
-    return this.createTombstone();
-  }
-
   addItem() {
-    this._items.push({
-      data: null,
-      node: null,
-      height: 0,
-      width: 0,
-      top: 0,
-    });
+    this._items.push({height: 0});
   }
 
-  createTombstone() {
-    return this.tombstone.createEmbeddedView(new VirtualListItem(null, NaN, NaN));
-  }
-  
-  render(item: any, node: EmbeddedViewRef<VirtualListItem>) {
-    if (!node)
-      return this._template.createEmbeddedView(new VirtualListItem(item, item.index, item.index+1));
-    node.context.$implicit = item;
-    node.context.index = item.index;
-    node.context.count = item.index+1;
-    return node;
+  getTombstone() {
+    var tombstone = this._tombstones.getView() as EmbeddedViewRef<any>;
+    if (!tombstone)
+      return this.tombstone.createEmbeddedView({});
+
+    tombstone.rootNodes[0].style.transform = '';
+    return tombstone;
   }
 }

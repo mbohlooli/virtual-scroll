@@ -9,6 +9,10 @@ export class Recycler {
   // The recycled elements
   private _scrapViews: ViewRef[] = [];
 
+  get size(): number {
+    return this._scrapViews.length;
+  }
+
   // get a view from recycle bin if possible
   getView(): ViewRef | null {
     let position = 0;
