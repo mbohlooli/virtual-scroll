@@ -33,6 +33,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   @Input('virtualForTombstone') tombstone!: TemplateRef<any>;
   @Input('virtualForMarginalItemsToRender') marginalItemsToRender: number = 2;
   @Input('virtualForHasMoreFn') hasMoreFn!: () => boolean;
+  @Input('maxTombstonesToShow') maxTombstonesToShow: number = 3;
 
   private _differ!: IterableDiffer<T>;
   private _items: ListItem[] = [];
@@ -75,7 +76,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
         this._tombstoneHeight = tombstone.rootNodes[0].offsetHeight;
         this._tombstoneWidth = tombstone.rootNodes[0].offsetWidth;
         this._viewContainerRef.remove(this._viewContainerRef.indexOf(tombstone));
-  
+        
         for (let i = 0; i < this._items.length; i++)
           this._items[i].width = this._items[i].height = 0;
         this.onScroll();
@@ -184,7 +185,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
 
   fill(start: number, end: number) {
     this._firstAttachedItem = Math.max(0, start);
-    this._lastAttachedItem = end;
+    this._lastAttachedItem = end; 
     this.attachContent();
   } 
 
@@ -242,14 +243,13 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
       }
 
       // TODO: fix the error that this line causes
-      if (tombstonesCount > 3) {
-        //! this line below solves the problem but introduces another one wich is the stops that occur sometimes on scroll end
-        this._lastAttachedItem = i;
-        break;
-      }
       let node = this._items[i].data ? this.render(this._items[i].data, this._unusedNodes.getView()) : this.getTombstone();
-      if (node.rootNodes[0].classList.contains('tombstone'))
+      if (node.rootNodes[0].classList.contains('tombstone')) {
+        node.rootNodes[0].style.display = 'unset';
         tombstonesCount++;
+        if (tombstonesCount > this.maxTombstonesToShow)
+          node.rootNodes[0].style.display = 'none';
+      }
       node.rootNodes[0].style.position = 'absolute';
       this._items[i].top = -1;
       this._viewContainerRef.insert(node);
@@ -299,7 +299,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     this._scrollTop += this._anchor.offset;
 
     // TODO: make a function for setting the sentinel position in virtual list component
-    this._renderer.setStyle(this._virtualList.sentinel.nativeElement, 'transform', `translateY(${this._scrollEnd+100}px)`);
+    this._renderer.setStyle(this._virtualList.sentinel.nativeElement, 'transform', `translateY(${this._scrollEnd+(this.hasMoreFn() ? 100 : 0)}px)`);
     // TODO: we don't hava a way to set this!
     // this.scroller_.scrollTop = this._scrollTop;
     this._measureRequired = false;
