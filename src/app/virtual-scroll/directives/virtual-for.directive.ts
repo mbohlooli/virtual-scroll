@@ -28,11 +28,11 @@ interface ScrollAnchor {
 export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDestroy {
   @Input('virtualForOf') data!: NgIterable<T>;
   @Input('virtualForTrackBy') trackBy!: TrackByFunction<T>;
-  // TODO: move the tombstone to virtual list component
-  @Input('virtualForTombstone') tombstone!: TemplateRef<any>;
-  @Input('virtualForMarginalItemsToRender') marginalItemsToRender: number = 2;
-  // TODO: this has to be a function?!
   @Input('virtualForHasMoreFn') hasMoreFn!: () => boolean;
+
+  @Input('virtualForTombstone') tombstone!: TemplateRef<any>;
+
+  @Input('virtualForMarginalItemsToRender') marginalItemsToRender: number = 2;
   @Input('virtualForMaxTombstonesToShow') maxTombstonesToShow: number = 3;
 
   private _differ!: IterableDiffer<T>;
@@ -148,7 +148,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     this.fill(this._anchor.index - this.marginalItemsToRender, lastIndex + this.marginalItemsToRender);
   }
 
-  // TODO: which is the anchor item? the first in dom or first in screen????
+  
   calculateAnchoredItem(initialAnchor: ScrollAnchor, delta: number) {
     if (delta == 0)
       return initialAnchor;
@@ -213,7 +213,6 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
         continue;
       }
       if (this._items[i].node)
-        //TODO: maybe do sth to not write node.rootNodes[0] every time 
         if (this._items[i].node.rootNodes[0].classList.contains('tombstone')) {
           this._viewContainerRef.detach(this._viewContainerRef.indexOf(this._items[i].node));
           this._tombstones.recycleView(this._items[i].node);
@@ -238,7 +237,6 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
         this._items[i].node = null;
       }
 
-      // TODO: fix the error that this line causes
       let node = this._items[i].data ? this.render(this._items[i].data, this._unusedNodes.getView()) : this.getTombstone();
       if (node.rootNodes[0].classList.contains('tombstone')) {
         node.rootNodes[0].style.display = 'unset';
@@ -295,8 +293,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     this._scrollTop += this._anchor.offset;
 
     this._virtualList.totalScroll = this._scrollEnd+(this.hasMoreFn() ? 100 : 0);
-    // TODO: we don't hava a way to set this!
-    // this.scroller_.scrollTop = this._scrollTop;
+    this._virtualList.scrollTop = this._scrollTop;
     this._measureRequired = false;
   }
 

@@ -60,6 +60,13 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
     this.sentinel.nativeElement.style.transform = `translateY(${height}px)`;
   }
 
+  set scrollTop(scrollTop: number) {
+    if (this.viewport)
+      this.viewport.nativeElement.scrollTop = scrollTop;
+    else
+      window.scroll(0, scrollTop);
+  }
+
   // Subjects that observe events that are important
   private _subscription = new Subscription();
   private _scrollPositionSubject = new BehaviorSubject<number>(-1);
