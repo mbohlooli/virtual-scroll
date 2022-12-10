@@ -326,6 +326,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     if (!tombstone)
       return this.tombstone.createEmbeddedView({});
 
+    tombstone.rootNodes[0].style.display = 'unset';
     tombstone.rootNodes[0].style.transform = '';
     return tombstone;
   }
