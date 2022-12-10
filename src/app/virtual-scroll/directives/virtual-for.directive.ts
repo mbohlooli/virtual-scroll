@@ -196,12 +196,14 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
         this._viewContainerRef.detach(index);
     }
 
-    requestAnimationFrame(() => this.getItemsSize());
+    requestAnimationFrame(() => {
+      this.getItemsSize();
+      if (this._measureRequired)
+        this.updateScroll();
+  
+      this.positionViews();
+    });
 
-    if (this._measureRequired)
-      this.updateScroll();
-
-    this.positionViews();
 
     this.maybeRequestContent();
   }
