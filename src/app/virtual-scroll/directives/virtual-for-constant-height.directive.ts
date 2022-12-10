@@ -20,7 +20,7 @@ import {
 } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
-import { VirtualListItem } from '../virtual-list-item';
+import { VirtualListNodeContext } from '../virtual-list-node-context';
 import { Recycler } from '../recycler';
 
 @Directive({
@@ -41,7 +41,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
   // The template of each list item
   @Input('virtualForConstantHeightTemplate')
-  set template(value: TemplateRef<VirtualListItem>) {
+  set template(value: TemplateRef<VirtualListNodeContext>) {
     if (value)
       this._template = value;
   }
@@ -106,7 +106,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     // An "IterableDiffer" factory for getting the _differ
     private _differs: IterableDiffers,
     // The template of each list item
-    private _template: TemplateRef<VirtualListItem>,
+    private _template: TemplateRef<VirtualListNodeContext>,
     // An abstraction for runway containing all visible elements in dom
     private _viewContainerRef: ViewContainerRef,
     // use for setting styles on html elements
@@ -259,7 +259,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
     if (isFastScroll) {
       for (let i = 0; i < this._viewContainerRef.length; i++) {
-        let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(i);
+        let child = <EmbeddedViewRef<VirtualListNodeContext>>this._viewContainerRef.get(i);
         this._viewContainerRef.detach(i);
         this._recycler.recycleView(child);
         i--;
@@ -277,13 +277,13 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
         this._offsetFromTop -= this._rowHeight / this._columns;
       }
       for (let i = this._lastItemVisibleIndex; i < this._previousEndIndex; i++) {
-        let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(this._viewContainerRef.length - 1);
+        let child = <EmbeddedViewRef<VirtualListNodeContext>>this._viewContainerRef.get(this._viewContainerRef.length - 1);
         this._viewContainerRef.detach(this._viewContainerRef.length - 1);
         this._recycler.recycleView(child);
       }
     } else if (isScrollDown) {
       for (let i = this._previousStartIndex; i < this._firstVisibleItemIndex; i++) {
-        let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(0);
+        let child = <EmbeddedViewRef<VirtualListNodeContext>>this._viewContainerRef.get(0);
         this._viewContainerRef.detach(0);
         this._offsetFromTop += this._rowHeight / this._columns;
         this._recycler.recycleView(child);
@@ -295,7 +295,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
       }
     } else {
       for (let i = 0; i < this._viewContainerRef.length; i++) {
-        let child = <EmbeddedViewRef<VirtualListItem>>this._viewContainerRef.get(i);
+        let child = <EmbeddedViewRef<VirtualListNodeContext>>this._viewContainerRef.get(i);
         this._viewContainerRef.detach(i);
         this._recycler.recycleView(child);
         i--;
@@ -333,12 +333,12 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
   // Creates a new view if recycler is empty otherwise gets view from recycler and changes the bindings
   private getView(position: number): ViewRef {
-    let view = this._recycler.getView() as EmbeddedViewRef<VirtualListItem>;
+    let view = this._recycler.getView() as EmbeddedViewRef<VirtualListNodeContext>;
     let item = this._collection[position];
     let count = this._collection.length;
 
     if (!view)
-      view = this._template.createEmbeddedView(new VirtualListItem(item, position, count));
+      view = this._template.createEmbeddedView(new VirtualListNodeContext(item, position, count));
     else {
       view.context.$implicit = item;
       view.context.index = position;

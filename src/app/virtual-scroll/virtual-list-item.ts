@@ -1,21 +1,8 @@
-// A class representing every element in virtual lists (virtualForConstantHeight and virtualFor)
-export class VirtualListItem {
-    constructor(public $implicit: any, public index: number, public count: number) {
-    }
-
-    get first(): boolean {
-        return this.index === 0;
-    }
-
-    get last(): boolean {
-        return this.index === this.count - 1;
-    }
-
-    get even(): boolean {
-        return this.index % 2 === 0;
-    }
-
-    get odd(): boolean {
-        return !this.even;
-    }
-}
+interface ListItem {
+    data?: any,
+    node?: any,
+    height: number,
+    width?: number,
+    top?: number
+  }
+  
