@@ -3,7 +3,6 @@ import {
   OnChanges, OnDestroy, OnInit, DoCheck,
   IterableChanges, IterableDiffer, SimpleChanges, IterableDiffers, NgIterable, TrackByFunction, 
   EmbeddedViewRef, TemplateRef, ViewContainerRef,
-  Renderer2
 } from '@angular/core';
 import { Subscription } from "rxjs";
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
@@ -32,8 +31,9 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   // TODO: move the tombstone to virtual list component
   @Input('virtualForTombstone') tombstone!: TemplateRef<any>;
   @Input('virtualForMarginalItemsToRender') marginalItemsToRender: number = 2;
+  // TODO: this has to be a function?!
   @Input('virtualForHasMoreFn') hasMoreFn!: () => boolean;
-  @Input('maxTombstonesToShow') maxTombstonesToShow: number = 3;
+  @Input('virtualForMaxTombstonesToShow') maxTombstonesToShow: number = 3;
 
   private _differ!: IterableDiffer<T>;
   private _items: ListItem[] = [];
@@ -62,8 +62,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     private _differs: IterableDiffers,
     private _viewContainerRef: ViewContainerRef,
     private _template: TemplateRef<VirtualListItem>,
-    private _virtualList: VirtualListComponent,
-    private _renderer: Renderer2
+    private _virtualList: VirtualListComponent
   ) {}
 
   ngOnInit(): void {
@@ -116,7 +115,6 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   }
 
   applyChanges(changes: IterableChanges<T>) {
-    //TODO: the logic of addcontent goes here
     changes.forEachOperation(({item, previousIndex}, adjustedPreviousIndex, currentIndex) => {
       if (previousIndex == null) {
         this._items.splice(currentIndex || 0, 0, {data: item, height: 0});
@@ -130,10 +128,8 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     });
     changes.forEachIdentityChange((record: any) => this._items[record.currentIndex].data = record.item);
 
-    // ! Danger line (may cause problems)
     this._requestInProgress = false;
 
-    // TODO: call the attachContent
     this.attachContent();
   }
 
@@ -298,8 +294,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
       this._scrollTop += this._items[i].height || this._tombstoneHeight;
     this._scrollTop += this._anchor.offset;
 
-    // TODO: make a function for setting the sentinel position in virtual list component
-    this._renderer.setStyle(this._virtualList.sentinel.nativeElement, 'transform', `translateY(${this._scrollEnd+(this.hasMoreFn() ? 100 : 0)}px)`);
+    this._virtualList.totalScroll = this._scrollEnd+(this.hasMoreFn() ? 100 : 0);
     // TODO: we don't hava a way to set this!
     // this.scroller_.scrollTop = this._scrollTop;
     this._measureRequired = false;
