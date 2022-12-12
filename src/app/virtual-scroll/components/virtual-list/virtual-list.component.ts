@@ -10,8 +10,7 @@ import {
 } from '@angular/core';
 import { BehaviorSubject, fromEvent, Subscription } from 'rxjs';
 import { debounceTime, map, tap } from "rxjs/operators";
-import { ScrollState } from '../../scroll-state';
-
+import {ScrollState} from '../../models/scroll-state';
 /**
  * Wrapper for a virtual list
  * used with virtualForConstantHeight or virtualFor directives
@@ -58,6 +57,7 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
 
   set totalScroll(height: number) {
     this.sentinel.nativeElement.style.transform = `translateY(${height}px)`;
+    this._listHolder.nativeElement.style.height = `${height}px`;
   }
 
   set scrollTop(scrollTop: number) {

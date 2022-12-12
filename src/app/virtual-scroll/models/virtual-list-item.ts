@@ -1,4 +1,4 @@
-interface ListItem {
+export interface ListItem {
     data?: any,
     node?: any,
     height: number,

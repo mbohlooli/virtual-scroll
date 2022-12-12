@@ -6,8 +6,9 @@ import {
 } from '@angular/core';
 import { Subscription } from "rxjs";
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
-import { Recycler } from '../recycler';
-import { VirtualListNodeContext } from '../virtual-list-node-context';
+import { Recycler } from '../models/recycler';
+import { VirtualListNodeContext } from '../models/virtual-list-node-context';
+import { ListItem } from "../models/virtual-list-item";
 
 @Directive({
   selector: '[virtualFor][virtualForOf]'
@@ -332,7 +333,6 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     this._scrollTop += this._anchor.offset;
 
     this._virtualList.totalScroll = this._scrollEnd+(this.hasMoreFn() ? this.additionalScrollPx : 0);
-    this._virtualList.scrollTop = this._scrollTop;
     this._measureRequired = false;
   }
 

@@ -20,8 +20,8 @@ import {
 } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
-import { VirtualListNodeContext } from '../virtual-list-node-context';
-import { Recycler } from '../recycler';
+import { VirtualListNodeContext } from '../models/virtual-list-node-context';
+import { Recycler } from '../models/recycler';
 
 @Directive({
   selector: '[virtualForConstantHeight][virtualForConstantHeightOf]'
@@ -56,7 +56,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
   @Input('virtualForConstantHeightLimit') limit: number = 8;
 
   // Set to true if we have a grid list
-  @Input('virtualForConstantHeightAbsolutePositioning')
+  @Input('virtualForConstantHeightGrid')
   set grid(isGrid: boolean) {
     this._absolutePositioning = !isGrid;
   }
@@ -66,6 +66,12 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
   // returns the number of columns for grid list (use for responsive layouts when the columns count depends on the screen size)
   @Input('virtualForConstantHeightColumnsFn') getColumnsFn!: () => number;
+
+  // Items to render offscreen after and before visible items
+  @Input('virtualForConstantHeightMarginalItemsToRender') marginalItemsToRender: number = 1;
+
+  // Additinal scrollable height at end of runway (can be negative too)
+  @Input('virtualForConstantHeightAdditionalScroll') additionalScroll: number = 10;
 
   // An internal copy of datasource
   private _collection!: any[];
@@ -169,10 +175,10 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
     let isMeasurementRequired = false;
 
-    changes.forEachOperation((item, adjustedPreviousIndex, currentIndex) => {
-      if (item.previousIndex == null) {
+    changes.forEachOperation(({ item, previousIndex }, adjustedPreviousIndex, currentIndex) => {
+      if (previousIndex == null) {
         isMeasurementRequired = true;
-        this._collection.splice(currentIndex || 0, 0, item.item);
+        this._collection.splice(currentIndex || 0, 0, item);
       } else if (currentIndex == null) {
         isMeasurementRequired = true;
         this._collection.splice(adjustedPreviousIndex || 0, 1);
@@ -183,7 +189,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
     changes.forEachIdentityChange((record: any) => this._collection[record.currentIndex] = record.item);
 
-    this._renderer.setStyle(this._virtualList.listHolder?.nativeElement, 'height', `${Math.ceil(this._collection.length / this._columns) * this._rowHeight}px`);
+    this._renderer.setStyle(this._virtualList.listHolder?.nativeElement, 'height', `${Math.ceil(this._collection.length / this._columns) * this._rowHeight + this.additionalScroll}px`);
     this._loading = false;
 
     if (isMeasurementRequired)
@@ -313,8 +319,8 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
 
   // Calculate the range of visible items in screen
   private findPositionInRange() {
-    this._firstVisibleItemIndex = Math.max(0, Math.floor(this._scrollY / this._rowHeight) * this._columns);
-    this._lastItemVisibleIndex = Math.min(this._collection.length, Math.ceil((this._scrollY + Math.floor(this._containerHeight)) / this._rowHeight) * this._columns);
+    this._firstVisibleItemIndex = Math.max(0, (Math.floor(this._scrollY / this._rowHeight) - this.marginalItemsToRender) * this._columns);
+    this._lastItemVisibleIndex = Math.min(this._collection.length, (Math.ceil((this._scrollY + Math.floor(this._containerHeight)) / this._rowHeight) + this.marginalItemsToRender) * this._columns);
 
     if (this._loading || this._lastItemVisibleIndex != this._collection.length) return;
 
