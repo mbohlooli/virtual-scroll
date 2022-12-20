@@ -1,10 +1,10 @@
 <virtual-list (scrollEnd)="scrollEnd()">
   <div class="list-item" *virtualFor="
-  let item of data;
-  let i = index;
-  maxTombstonesToShow: 1;
-  tombstone: loading;
-  hasMoreFn: hasMore
+    let item of data;
+    let i = index;
+    maxTombstonesToShow: 1;
+    tombstone: loading;
+    hasMoreFn: hasMore
   ">
     <article class="article" (click)="expand(data.indexOf(item))">
       {{data.indexOf(item)}}
