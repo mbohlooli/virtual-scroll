@@ -11,7 +11,7 @@ export class ExpandService {
     return this._expantionSubject.asObservable();
   }
 
-  private _expantionSubject = new BehaviorSubject(0);
+  private _expantionSubject = new BehaviorSubject(-1);
 
   expand(index: number) {
     this._expantionSubject.next(index);

@@ -63,6 +63,8 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
 
   private _subscription = new Subscription();
 
+  private _expandeds: boolean[] = [];
+
 
   constructor(
     //? A factory for getting an iterable differ
@@ -147,14 +149,17 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
           this._measureRequired = true;
         }
         this._items.splice(currentIndex || 0, 0, {data: item, height: 0});
+        this._expandeds.splice(currentIndex || 0, 0, false);
         this._loadedItems++;
       } else if (currentIndex == null) {
         //? Delete item
         this._items.splice(adjustedPreviousIndex || 0, 1);
+        this._expandeds.splice(currentIndex || 0, 1);
         this._loadedItems--;
       } else {
         //? Adjust item position in list
         this._items.splice(currentIndex, 0, this._items.splice(adjustedPreviousIndex || 0, 1)[0]);
+        this._expandeds.splice(currentIndex, 0, this._expandeds.splice(adjustedPreviousIndex || 0, 1)[0]);
       }
     });
     //? Properties of an item change
@@ -286,7 +291,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
       }
 
       //? Render an item or tombstone
-      let node = this._items[i].data ? this.render(this._items[i].data, this._unusedNodes.getView()) : this.getTombstone();
+      let node = this._items[i].data ? this.render(this._items[i].data, i, this._unusedNodes.getView()) : this.getTombstone();
       if (node.rootNodes[0].classList.contains('tombstone')) {
         node.rootNodes[0].style.display = 'unset';
         tombstonesCount++;
@@ -303,6 +308,9 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   }
 
   onExpand(index: number) {
+    if (index < 0) return;
+    this._expandeds[index] = !this._expandeds[index];
+    this._items[index].node.context.expanded = this._expandeds[index];
     for (let i = index; i < this._items.length; i++)
       this._items[i].width = this._items[i].height = 0;
     this.onScroll();
@@ -369,12 +377,13 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   }
 
   //? renders the given data in given node
-  render(data: any, node: any) {
+  render(data: any, index: number, node: any) {
     if (!node)
-      return this._template.createEmbeddedView(new VirtualListNodeContext(data, data.index, this._loadedItems));
+      return this._template.createEmbeddedView(new VirtualListNodeContext(data, index, this._loadedItems, this._expandeds[index]));
 
     node.context.$implicit = data;
-    node.context.index = data.index;
+    node.context.index = index;
+    node.context.expanded = this._expandeds[index];
     node.context.count = this._loadedItems;
     return node;
   }

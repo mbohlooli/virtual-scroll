@@ -63,11 +63,11 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     setTimeout(() => {
-      for (let i = 0; i < 10; i++)
+      for (let i = 0; i < 50; i++)
         this.data.push({
           index: i,
           text: this.generateRandomText(),
-          image: Math.random() > 0.8 ? this.randomImage : ''
+          image: Math.random() > 0.8 ? this.randomImage : '',
         });
       this.loading = false;
       this.hasSentRequest = true;
@@ -87,21 +87,21 @@ export class AppComponent implements OnInit {
 
   scrollEnd() {
     if (!this.hasSentRequest) return;
-    if (this.data.length >= 200) return;
+    if (this.data.length >= 100) return;
     this.loading = true;
     setTimeout(() => {
       for (let i = 0; i < 10; i++)
         this.data.push({
           index: i,
           text: this.generateRandomText(),
-          image: Math.random() > 0.8 ? this.randomImage : ''
+          image: Math.random() > 0.8 ? this.randomImage : '',
         });
       this.loading = false;
       }, 500);
   }
 
   hasMore = () => {
-    return this.data.length < 200;
+    return this.data.length < 100;
   }
 
   getHeight = (item: { index: number, text: string, image: string }) => {
@@ -119,8 +119,11 @@ export class AppComponent implements OnInit {
     this.data[index].text = 'this is the awesome new text.';
   }
 
-  expand(index: number) {
-    this.data[index].text += this.data[index].text;
+  expand(index: number, expanded: boolean) {
+    if (expanded) {
+      this.data[index].text = this.data[index].text.slice(0, this.data[index].text.length/2);
+    }
+    expanded = !expanded;
     this._expantionService.expand(index);
   }
 
@@ -131,7 +134,7 @@ export class AppComponent implements OnInit {
       this.data.splice(0, 0, {
         index: 0,
         text: this.generateRandomText(),
-        image: Math.random() > 0.8 ? this.randomImage : ''
+        image: Math.random() > 0.8 ? this.randomImage : '',
       });
       }, 500);
   }

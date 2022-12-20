@@ -3,16 +3,26 @@
   <div class="list-item" *virtualFor="
     let item of data;
     let i = index;
+    let e = expanded;
     maxTombstonesToShow: 1;
     tombstone: loading;
     hasMoreFn: hasMore
   ">
-    <article class="article" (click)="expand(data.indexOf(item))">
+    <article class="article" [class.red]="e" (click)="expand(data.indexOf(item), e)">
+      {{e}}
       {{data.indexOf(item)}}
       <!-- <div *ngIf="item?.image" class="image-container">
         <img [src]="item.image">
       </div> -->
       {{item?.text}}
+      <ng-container *ngIf="e">
+        {{item?.text}}
+        {{item?.text}}
+        {{item?.text}}
+        {{item?.text}}
+
+      </ng-container>
+      
     </article>
   </div>
 </virtual-list>

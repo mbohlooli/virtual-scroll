@@ -1,6 +1,6 @@
 // A class representing every element in virtual lists (virtualForConstantHeight and virtualFor)
 export class VirtualListNodeContext {
-    constructor(public $implicit: any, public index: number, public count: number) {
+    constructor(public $implicit: any, public index: number, public count: number, public expanded: boolean) {
     }
 
     get first(): boolean {

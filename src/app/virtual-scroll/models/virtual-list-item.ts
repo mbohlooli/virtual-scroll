@@ -3,6 +3,6 @@ export interface ListItem {
     node?: any,
     height: number,
     width?: number,
-    top?: number
+    top?: number,
   }
   

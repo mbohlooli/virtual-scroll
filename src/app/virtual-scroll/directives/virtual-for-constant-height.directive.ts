@@ -344,7 +344,7 @@ export class VirtualForConstantHeightDirective<T> implements OnInit, OnChanges, 
     let count = this._collection.length;
 
     if (!view)
-      view = this._template.createEmbeddedView(new VirtualListNodeContext(item, position, count));
+      view = this._template.createEmbeddedView(new VirtualListNodeContext(item, position, count, false));
     else {
       view.context.$implicit = item;
       view.context.index = position;
