@@ -59,6 +59,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   private _scrollEnd = 0;
 
   private _addTombstoneHeight = false;
+  private _itemAddedFromTop = false;
 
   private _subscription = new Subscription();
 
@@ -137,12 +138,14 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   }
 
   applyChanges(changes: IterableChanges<T>) {
-    let added = false;
-
     //? Changing the items based on the changes we got from differ
     changes.forEachOperation(({item, previousIndex}, adjustedPreviousIndex, currentIndex) => {
       if (previousIndex == null) {
         //? Insert item
+        if (currentIndex == 0) {
+          this._itemAddedFromTop = true;
+          this._measureRequired = true;
+        }
         this._items.splice(currentIndex || 0, 0, {data: item, height: 0});
         this._loadedItems++;
       } else if (currentIndex == null) {
@@ -355,6 +358,12 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
       // ! Why only window.scrollY works?
       window.scrollTo(0, window.scrollY+this._tombstoneHeight);
       this._addTombstoneHeight = false;
+    }
+    // TODO: why the tombstone shows up?!?!?!
+    if (this._itemAddedFromTop) {
+      window.scrollTo(0,0);
+      console.log(window.scrollY);
+      this._itemAddedFromTop = false;
     }
     this._measureRequired = false;
   }

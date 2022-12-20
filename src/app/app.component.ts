@@ -90,7 +90,7 @@ export class AppComponent implements OnInit {
     if (this.data.length >= 200) return;
     this.loading = true;
     setTimeout(() => {
-      for (let i = 0; i < 5; i++)
+      for (let i = 0; i < 10; i++)
         this.data.push({
           index: i,
           text: this.generateRandomText(),
@@ -122,5 +122,17 @@ export class AppComponent implements OnInit {
   expand(index: number) {
     this.data[index].text += this.data[index].text;
     this._expantionService.expand(index);
+  }
+
+  addTop() {
+    setTimeout(() => {
+
+      this.loading = false;
+      this.data.splice(0, 0, {
+        index: 0,
+        text: this.generateRandomText(),
+        image: Math.random() > 0.8 ? this.randomImage : ''
+      });
+      }, 500);
   }
 }
