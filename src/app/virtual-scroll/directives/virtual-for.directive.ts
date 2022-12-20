@@ -57,7 +57,10 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   //? Total scroll height
   private _scrollEnd = 0;
 
+  private _addTombstoneHeight = false;
+
   private _subscription = new Subscription();
+
 
   constructor(
     //? A factory for getting an iterable differ
@@ -128,6 +131,8 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
   }
 
   applyChanges(changes: IterableChanges<T>) {
+    let added = false;
+
     //? Changing the items based on the changes we got from differ
     changes.forEachOperation(({item, previousIndex}, adjustedPreviousIndex, currentIndex) => {
       if (previousIndex == null) {
@@ -333,6 +338,12 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     this._scrollTop += this._anchor.offset;
 
     this._virtualList.totalScroll = this._scrollEnd+(this.hasMoreFn() ? this.additionalScrollPx : 0);
+    if (this._addTombstoneHeight) {
+      // TODO: solve this
+      // ! Why only window.scrollY works?
+      window.scrollTo(0, window.scrollY+this._tombstoneHeight);
+      this._addTombstoneHeight = false;
+    }
     this._measureRequired = false;
   }
 
@@ -355,6 +366,7 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     if (itemsNeeded <= 0) return;
 
     this._requestInProgress = true;
+    this._addTombstoneHeight = true;
     this._virtualList.onScrollEnd();
   }
 

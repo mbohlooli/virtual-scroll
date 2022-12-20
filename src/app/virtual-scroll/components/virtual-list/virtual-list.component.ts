@@ -52,7 +52,7 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
   }
 
   get scrollTop() {
-    return this.viewport ? this.viewport.nativeElement.scrollTop : window.scrollY - this._scrollOffset;
+    return (this.viewport ? this.viewport.nativeElement.scrollTop : window.scrollY) - this._scrollOffset;
   }
 
   set totalScroll(height: number) {
@@ -127,6 +127,13 @@ export class VirtualListComponent implements AfterViewInit, OnDestroy {
 
   onScrollEnd() {
     this._onScrollEnd.emit();
+  }
+
+  scrollTo(scroll: number) {
+    // if (this.viewport)
+    //   this.viewport.nativeElement.scrollTo(0, scroll);
+    // else
+      window.scrollTo(0, scroll);
   }
 
   // get the viewport dimensions
