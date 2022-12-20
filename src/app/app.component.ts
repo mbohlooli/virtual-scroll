@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { ExpandService } from './virtual-scroll/services/expand.service';
 
 @Component({
   selector: 'app-root',
@@ -57,6 +58,8 @@ export class AppComponent implements OnInit {
   get randomImage() {
     return this.images[Math.floor(Math.random() * this.images.length)]
   }
+
+  constructor(private _expantionService: ExpandService) {}
 
   ngOnInit(): void {
     setTimeout(() => {
@@ -118,5 +121,6 @@ export class AppComponent implements OnInit {
 
   expand(index: number) {
     this.data[index].text += this.data[index].text;
+    this._expantionService.expand(index);
   }
 }

@@ -9,6 +9,7 @@ import { VirtualListComponent } from '../components/virtual-list/virtual-list.co
 import { Recycler } from '../models/recycler';
 import { VirtualListNodeContext } from '../models/virtual-list-node-context';
 import { ListItem } from "../models/virtual-list-item";
+import { ExpandService as ExpandService } from '../services/expand.service';
 
 @Directive({
   selector: '[virtualFor][virtualForOf]'
@@ -70,7 +71,9 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     //? The template of each item
     private _template: TemplateRef<VirtualListNodeContext>,
     //? Refrence to the virtual list component surrounding the directive to respond and emit events
-    private _virtualList: VirtualListComponent
+    private _virtualList: VirtualListComponent,
+    //? This service notifies us if size of a rendered item changed so we can reposition views
+    private _expandService: ExpandService
   ) {}
 
   ngOnInit(): void {
@@ -96,6 +99,9 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     this._subscription.add(
       //? Call on scroll when we scroll
       this._virtualList.scrollPosition$.subscribe(() => this.onScroll())
+    );
+    this._subscription.add(
+      this._expandService.expantion$.subscribe((index: number) => this.onExpand(index))
     );
   }
 
@@ -291,6 +297,12 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
       this._viewContainerRef.insert(node);
       this._items[i].node = node;
     }
+  }
+
+  onExpand(index: number) {
+    for (let i = index; i < this._items.length; i++)
+      this._items[i].width = this._items[i].height = 0;
+    this.onScroll();
   }
 
   //? Calculates the exact size of items visible
