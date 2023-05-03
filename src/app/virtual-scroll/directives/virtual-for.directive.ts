@@ -4,7 +4,7 @@ import {
   IterableChanges, IterableDiffer, SimpleChanges, IterableDiffers, NgIterable, TrackByFunction, 
   EmbeddedViewRef, TemplateRef, ViewContainerRef,
 } from '@angular/core';
-import { Subscription } from "rxjs";
+import { Subscription, filter } from "rxjs";
 import { VirtualListComponent } from '../components/virtual-list/virtual-list.component';
 import { Recycler } from '../models/recycler';
 import { VirtualListNodeContext } from '../models/virtual-list-node-context';
@@ -101,7 +101,9 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     );
     this._subscription.add(
       //? Call on scroll when we scroll
-      this._virtualList.scrollPosition$.subscribe(() => this.onScroll())
+      this._virtualList.scrollPosition$.pipe(filter(s => Math.abs(s-this._scrollTop) >= 200)).subscribe(() => {
+        this.onScroll()
+      })
     );
     this._subscription.add(
       this._expandService.expantion$.subscribe((index: number) => this.onExpand(index))
@@ -370,7 +372,6 @@ export class VirtualForDirective<T> implements OnChanges, DoCheck, OnInit, OnDes
     // TODO: why the tombstone shows up?!?!?!
     if (this._itemAddedFromTop) {
       window.scrollTo(0,0);
-      console.log(window.scrollY);
       this._itemAddedFromTop = false;
     }
     this._measureRequired = false;

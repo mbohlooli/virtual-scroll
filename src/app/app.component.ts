@@ -120,9 +120,6 @@ export class AppComponent implements OnInit {
   }
 
   expand(index: number, expanded: boolean) {
-    if (expanded) {
-      this.data[index].text = this.data[index].text.slice(0, this.data[index].text.length/2);
-    }
     expanded = !expanded;
     this._expantionService.expand(index);
   }

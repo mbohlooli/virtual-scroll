@@ -1,9 +1,11 @@
+<button (click)="addTop()">new feeds</button>
 
 <virtual-list (scrollEnd)="scrollEnd()">
   <div class="list-item" *virtualFor="
     let item of data;
     let i = index;
     let e = expanded;
+    marginalItemsToRender: 4;
     maxTombstonesToShow: 1;
     tombstone: loading;
     hasMoreFn: hasMore
@@ -42,4 +44,3 @@
     <article class="article fixed-height-article"></article>
   </div>
 </ng-template>
-<button (click)="addTop()">new feeds</button>
